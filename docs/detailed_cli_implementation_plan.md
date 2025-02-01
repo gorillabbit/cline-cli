@@ -2,12 +2,19 @@
 
 ## 検討事項と詳細計画
 
-### 1. コアロジックの特定とVS Code依存性の分離
+### 1. コアロジックの特定とCLI依存性の分離
 
-- **API連携ロジック (`src/api`)**:  この部分はCLIアプリでも**ほぼそのまま**再利用可能です。`ApiHandler` インターフェースと各プロバイダーハンドラー (`AnthropicHandler`, `OpenAiHandler` など) は、VS Code API に直接依存していません。設定 (APIキーなど) のCLIからの受け渡し方法を検討する必要があります。
-- **コアアプリケーションロジック (`src/core`)**:  `Cline` クラスは、VS Code 拡張機能の中心的なロジックを担っていますが、Webview や VS Code API との直接的な依存関係があります。
-    - `ClineProvider` への依存を分離する必要があります。`Cline` クラスを**インターフェース** (`ClineInterface` など) と実装クラス (`ClineImpl` など) に分割し、`ClineImpl` は `ClineInterface` に依存するように変更します。
-    - CLI アプリケーション用の新しい実装クラス (`CliCline` など) を作成し、`ClineInterface` を実装します。`CliCline` は、CLI 環境に特化した処理 (入出力、ツール実行など) を実装します。
+- **API連携ロジック (`src/api`)**:  この部分はCLIアプリでも**ほぼそのまま**再利用可能です。`ApiHandler` インターフェースと各プロバイダーハンドラー (`AnthropicHandler`, `OpenAiHandler` など) は、CLI 環境に直接依存していません。設定 (APIキーなど) のCLIからの受け渡し方法を検討する必要があります。
+- **コアアプリケーションロジック (`src/core`)**:  `Cline` クラスは、アプリケーションの中心的なロジックを担っていますが、現在の実装は VS Code 拡張機能として動作することを前提としています。**CLIアプリケーションとして `Cline` クラスを独立させるためには、以下の修正が必要です。**
+    - **不要な依存性の分離**:
+        - 現在の `Cline` クラスは、VS Code 拡張機能固有の機能に依存している可能性があります。CLI アプリケーションには不要なこれらの依存関係を分離する必要があります。
+        - 具体的には、`Cline` クラスから CLI アプリケーションに不要な部分を抽出し、**インターフェース** (`ClineInterface` など) として定義します。
+        - `Cline` クラスは、このインターフェースにのみ依存するように変更します。
+    - **`Cline` クラスの分割とCLI実装**:
+        - `Cline` クラスを**インターフェース** (`ClineInterface`) と**CLI実装クラス** (`CliCline`) に分割します。
+        - `CliCline` クラスは、CLI アプリケーションとして動作する `Cline` の具体的な実装を担い、`ClineInterface` を実装します。
+        - `CliCline` は、CLI 環境に特化した処理 (入出力、ツール実行、ファイルシステムアクセスなど) を実装し、CLI 環境以外の依存性を持たないようにします。
+        - これにより、コアロジックは `ClineInterface` を通じて抽象化され、CLI アプリケーションとして独立して動作可能になります。
 - **共有ユーティリティ (`src/shared`, `src/utils`)**:  これらのユーティリティ関数は**そのまま**再利用可能です。
 - **MCP連携 (`src/services/mcp`)**:  MCP連携機能はCLIアプリでも**有用**です。MCPサーバーとの通信ロジックは再利用可能です。MCP設定は、CLI引数 `--mcp-server-config` で設定ファイルパスを指定するか、環境変数で設定することを検討します。
 - **ブラウザ連携 (`src/services/browser`)**:  CLI アプリケーションでは**ブラウザ連携機能は不要**です。以下のものを削除します。
@@ -40,11 +47,11 @@
         - `constructor` から `this.browserSession = new BrowserSession(this.logger);` の初期化処理を**削除**します。
         - `_onDidDispose` メソッドから `this.cleanupBrowserSession();` の呼び出しを**削除**します。
 
-### 2. VS Code依存性の分離の詳細
+### 2. CLI依存性の分離の詳細
 
 - **UI要素の置換**:
     1. **ユーザーインタラクション**:  `ask` メソッドを CLI 環境に合わせて再実装します。`readline` モジュール等を用いて、コマンドラインプロンプトからの入力を受け付けるように変更します。`say` メソッドは、`console.log` などで標準出力にテキストを書き出すように変更します。
-    2. **差分表示**:  `DiffViewProvider` は CLI アプリケーションでは不要です。`replace_in_file` ツール実行後、`diff` コマンドを `child_process` で実行し、結果を標準出力に表示する関数 (`displayDiff` など) を `CliCline` に実装します。Node.js の `diff` ライブラリの利用も検討します。
+    2. **差分表示**:  CLI アプリケーションでは、VS Code のようなGUI差分表示は不要です。`replace_in_file` ツール実行後、`diff` コマンドを `child_process` で実行し、結果を標準出力に表示する関数 (`displayDiff` など) を `CliCline` に実装します。Node.js の `diff` ライブラリの利用も検討します。
 - **UI要素の置換**:  `CliCline` クラス (`src/lib/cline.ts`) で以下のメソッドを**書き換え**ます。
     1. `async ask(prompt: string): Promise<string>` メソッドを**書き換え**ます。
         - `readline.question` を使用して、コマンドラインプロンプトに `prompt` を表示し、ユーザーからの入力を取得するように実装します。
@@ -56,8 +63,8 @@
         - 色分け表示は、`chalk` などのライブラリ (`import chalk from 'chalk';`) を用いて**実装を検討**します (必須ではありません)。
 
 
-- **ファイルシステムアクセスの置換**:  `vscode.workspace.fs` を `fs` モジュールに置き換える作業は比較的 straightforward です。`fs` モジュールを使用するようにコードを修正します。
-- **VS Code統合機能の削除**:  `integrations` ディレクトリ以下の `checkpoints`, `debug`, `diagnostics`, `editor`, `notifications`, `theme`, `workspace`  は、CLI アプリケーションでは**基本的に不要**と判断し、削除または `#ifdef` で CLIビルドから除外します。
+- **ファイルシステムアクセスの置換**:  `vscode.workspace.fs` を Node.js の `fs` モジュールに置き換えます。`fs` モジュールを使用するようにコードを修正します。
+- **不要な機能の削除**:  `integrations` ディレクトリ以下の `checkpoints`, `debug`, `diagnostics`, `editor`, `notifications`, `theme`, `workspace`  は、CLI アプリケーションでは**基本的に不要**と判断し、削除します。
     - ただし、`terminal`  (`TerminalManager`, `TerminalProcess`, `TerminalRegistry`) は、CLI アプリケーションでも**再利用可能**です。`execute_command` ツール実行に利用します。
     - `misc` 内の汎用的な機能 (Markdownエクスポート, テキスト抽出, ファイルオープン) は、CLI アプリケーションでも**再利用可能**です。
 
@@ -73,7 +80,7 @@
     7. `--mcp-server-config <path>`: MCP サーバー設定ファイルパス (オプション)
     8. `--log-level <level>`: ログレベル (オプション、デフォルトは info)
     9. `--log-file <path>`: ログファイルパス (オプション、デフォルトは標準出力)
-- **コアロジック初期化**:  `CliCline` クラスのインスタンスを生成し、コマンドライン引数で設定された API 設定、タスク指示などを渡します。VS Code 拡張機能コンテキストは不要になります。
+- **コアロジック初期化**:  `CliCline` クラスのインスタンスを生成し、コマンドライン引数で設定された API 設定、タスク指示などを渡します。
 - **CLIベースの入出力**:
     1. 初期段階では、`readline` でユーザーからの指示入力を受け付けるプロンプトを実装します (デバッグ用、最終的には削除)。
     2. `console.log` で AI の応答、ツール実行結果、エラーメッセージなどを標準出力に表示します。
@@ -103,16 +110,16 @@
     │   ├── core/         # core ロジック (assistant-message, mentions, prompts, sliding-window)
     │   └── services/      # services (auth, browser (CLI実装検討), glob, logging, mcp, ripgrep, tree-sitter)
     ├── cli.ts            # CLI アプリケーションのエントリーポイント
-    ├── extension.ts      # VS Code 拡張機能のエントリーポイント (現状維持)
+    ├── extension.ts      # VS Code 拡張機能のエントリーポイント (現状維持)  <- CLIアプリでは削除
     ├── shared/
     └── utils/
     ```
-- **インターフェース定義**:  `ClineInterface` を `src/lib/cline.ts` に定義し、`ClineImpl` と `CliCline` が実装します。ツール実行関連のインターフェース (`ToolExecutorInterface` など) の定義も検討します。
-- **依存性注入**:  コンストラクタインジェクションなどを活用し、`Cline` クラス (および `CliCline`) の依存関係を明示的に管理します。DI コンテナライブラリの導入は、現時点では**オーバースペック**と判断し、手動 DI で進めます。
+- **インターフェース定義**:  `ClineInterface` を `src/lib/cline.ts` に定義し、`ClineImpl` は削除、`CliCline` が実装します。ツール実行関連のインターフェース (`ToolExecutorInterface` など) の定義も検討します。
+- **依存性注入**:  コンストラクタインジェクションなどを活用し、`CliCline` クラスの依存関係を明示的に管理します。DI コンテナライブラリの導入は、現時点では**オーバースペック**と判断し、手動 DI で進めます。
 
 ### 5. CLIアプリケーションのビルドの詳細
 
-1. `tsconfig.json`:  `compilerOptions.outDir` を `build` ディレクトリ、`compilerOptions.rootDir` を `src` ディレクトリに設定します。CLI アプリケーション用の `tsconfig.cli.json` を作成し、`extension.ts` と `cli.ts` で異なる設定 (module, target など) を指定することも検討します。**今回は単一の tsconfig.json で対応**します。
+1. `tsconfig.json`:  `compilerOptions.outDir` を `build` ディレクトリ、`compilerOptions.rootDir` を `src` ディレクトリに設定します。CLI アプリケーション用の `tsconfig.cli.json` を作成し、`cli.ts` のみをビルド対象とすることも検討します。**今回は単一の tsconfig.json で対応**します。
 2. `package.json`:
     ```json
     {
@@ -121,10 +128,10 @@
       },
       "scripts": {
         "build": "tsc && node -e \\"require('fs').chmodSync('build/cli.js', '755')\\"", // ビルドスクリプトを更新
-        "build:cli": "tsc -p tsconfig.cli.json", // CLI アプリ専用ビルドスクリプト (必要に応じて)
-        "dev": "vscode-test --extensionDevelopmentPath=. test/",
+        "build:cli": "tsc -p tsconfig.cli.json", // CLI アプリ専用ビルドスクリプト (必要に応じて) <- CLIアプリでは不要
+        "dev": "vscode-test --extensionDevelopmentPath=. test/",  // <- CLIアプリでは不要
         "lint": "eslint src --ext ts",
-        "watch": "tsc -w"
+        "watch": "tsc -w" // ビルドスクリプトを更新
       },
       "devDependencies": { ... },
       "dependencies": {
@@ -143,7 +150,7 @@
 
 ## 実装スケジュール (概算)
 
-1. **コアロジック特定とVS Code依存性分離**: 3日
+1. **コアロジック特定とCLI依存性分離**: 3日
 2. **CLIエントリポイント作成**: 2日
 3. **コードベースリファクタリング**: 3日
 4. **CLIアプリケーションビルド**: 1日
@@ -153,7 +160,7 @@
 
 ## 実装後の展望
 
-1. **VS Code 拡張機能との連携**:  CLI アプリケーションを VS Code 拡張機能から呼び出す機能 (`execute_command` ツールで `cline-cli` コマンドを実行するなど) を検討します。これにより、VS Code から CLI アプリケーションの機能を利用できるようになり、より柔軟なワークフローが実現できます。
+1. **VS Code 拡張機能との連携**:  CLI アプリケーションを VS Code 拡張機能から呼び出す機能 (`execute_command` ツールで `cline-cli` コマンドを実行するなど) を検討します。これにより、VS Code から CLI アプリケーションの機能を利用できるようになり、より柔軟なワークフローが実現できます。 **<- CLIアプリ単独のため、この項目は削除**
 2. **CI/CDパイプラインへの統合**:  CLI アプリケーションを CI/CD パイプラインに統合し、自動ビルド、テスト、デプロイを可能にすることを検討します。
 3. **パッケージマネージャーへの登録**:  CLI アプリケーションを npm や yarn などのパッケージマネージャーに登録し、`npm install -g cline-cli` などでグローバルにインストールできるようにすることを検討します。
 4. **ドキュメント整備**:  CLI アプリケーションのドキュメント (README, ヘルプメッセージ, etc.) を整備し、ユーザーが CLI アプリケーションを容易に利用できるようにします。
@@ -161,5 +168,5 @@
 
 ## 今後のステップ
 
-1. この詳細実装計画に基づき、**1. コアロジックの特定とVS Code依存性の分離** から着手します。具体的には、`Cline` クラスのインターフェース (`ClineInterface`) 定義、実装クラス (`ClineImpl`, `CliCline`) のスケルトンコード作成、`ClineProvider` への依存性分離を行います。
+1. この詳細実装計画に基づき、**1. コアロジックの特定とCLI依存性の分離** から着手します。具体的には、`Cline` クラスのインターフェース (`ClineInterface`) 定義、CLI実装クラス (`CliCline`) のスケルトンコード作成、不要な依存性分離を行います。
 2. 実装を進捗に合わせて計画を適宜修正していきます。
