@@ -1,0 +1,99 @@
+# srcディレクトリファイル説明
+
+このドキュメントでは、`src`ディレクトリ以下の各ファイルとディレクトリの概要を説明します。
+
+## ファイルとディレクトリ構成
+
+- **extension.ts**: VS Code拡張機能のエントリーポイントとなるファイルです。拡張機能の起動、コマンド登録、Webviewの管理など、拡張機能全体のライフサイクルを制御します。
+    - `activate(context: vscode.ExtensionContext)`: 拡張機能がアクティブ化されたときに実行される関数です。
+        - `outputChannel`: Cline拡張機能の出力チャネルを作成し、ログを表示するために使用されます。
+        - `sidebarProvider`: `ClineProvider`クラスのインスタンスを作成し、サイドバーのWebviewを管理します。
+        - `vscode.window.registerWebviewViewProvider`: サイドバーWebviewをVS Codeに登録します。
+        - `vscode.commands.registerCommand`: 各種コマンド (`cline.plusButtonClicked`, `cline.mcpButtonClicked`, `cline.popoutButtonClicked`, `cline.openInNewTab`, `cline.settingsButtonClicked`, `cline.historyButtonClicked`, `cline.accountLoginClicked`) を登録し、Webviewからのアクションに応じて処理を実行します。
+        - `diffContentProvider`: `TextDocumentContentProvider`インターフェースを実装するクラスのインスタンスを作成し、Diff Viewの左側のコンテンツを提供します。
+        - `vscode.workspace.registerTextDocumentContentProvider`: Diff ViewのコンテンツプロバイダーをVS Codeに登録します。
+        - `vscode.window.registerUriHandler`: URIハンドラーを登録し、拡張機能のURI (`/openrouter`, `/auth`) を処理します。
+        - `createClineAPI`: 拡張機能APIを作成し、外部から拡張機能の機能を利用できるようにします。
+    - `deactivate()`: 拡張機能が非アクティブ化されたときに実行される関数です。
+- **api/**: 各APIプロバイダーとの通信を抽象化するAPI関連のファイルが含まれています。
+    - **api/index.ts**: APIハンドラーのビルド関数 (`buildApiHandler`) を定義し、APIプロバイダーに基づいて適切なハンドラーを選択します。
+        - `buildApiHandler(configuration: ApiConfiguration)`:  `ApiConfiguration`に基づいて適切な`ApiHandler`インスタンスを生成するファクトリ関数です。指定された`apiProvider`に基づいて、対応するAPIハンドラーのインスタンスを生成し返します。
+    - **api/providers/**: 各APIプロバイダー (Anthropic, Bedrock, OpenRouter, Vertex, OpenAI, Ollama, LM Studio, Gemini, OpenAI Native, DeepSeek, Mistral, VS Code LM) のハンドラー実装が含まれています。各ファイルは、それぞれのAPIプロバイダーとの通信ロジックを実装します。
+        - **anthropic.ts**: Anthropic APIのハンドラー実装。
+            - `AnthropicHandler`: Anthropic APIを扱うクラス。
+                - `constructor(options: ApiHandlerOptions)`: コンストラクタ。APIキーなどのオプションを設定し、Anthropicクライアントを初期化します。
+                - `createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[])`: Anthropic APIを使用してメッセージストリームを作成する非同期ジェネレータ関数。プロンプトキャッシュを使用し、Anthropic APIにリクエストを送信して、応答ストリームを返します。
+                - `getModel()`: AnthropicモデルのIDと情報を返す関数。設定されたモデルIDまたはデフォルトモデルIDを返します。
+        - **bedrock.ts**: AWS Bedrock APIのハンドラー実装。
+            - `AwsBedrockHandler`: AWS Bedrock APIを扱うクラス。
+                - `constructor(options: ApiHandlerOptions)`: コンストラクタ。APIキーなどのオプションを設定し、Bedrockクライアントを初期化します。
+                - `createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[])`: AWS Bedrock APIを使用してメッセージストリームを作成する非同期ジェネレータ関数。Bedrock APIにリクエストを送信して、応答ストリームを返します。
+                - `getModel()`: BedrockモデルのIDと情報を返す関数。設定されたモデルIDまたはデフォルトモデルIDを返します。
+    - **api/transform/**: APIからのストリームデータを変換・整形する処理を実装するファイルが含まれています。
+- **core/**: アプリケーションのコアロジックを実装するファイルが含まれています。
+    - **core/Cline.ts**: アプリケーションの主要クラス `Cline` を定義します。Clineクラスは、アプリケーションの状態管理、APIハンドラーの保持、メッセージ処理などを担当します。
+        - `Cline`: アプリケーションの主要クラス。
+            - `constructor(provider: ClineProvider, apiConfiguration: ApiConfiguration, autoApprovalSettings: AutoApprovalSettings, browserSettings: BrowserSettings, chatSettings: ChatSettings, customInstructions?: string, task?: string, images?: string[], historyItem?: HistoryItem)`: コンストラクタ。各種設定、APIハンドラー、ターミナルマネージャー、ブラウザセッションなどを初期化し、新規タスクを開始または履歴からタスクを再開します。
+            - `updateBrowserSettings(browserSettings: BrowserSettings)`: ブラウザ設定を更新します。
+            - `updateChatSettings(chatSettings: ChatSettings)`: チャット設定を更新します。
+            - `ensureTaskDirectoryExists()`: タスクディレクトリが存在することを確認し、存在しない場合は作成します。
+            - `getSavedApiConversationHistory()`: 保存されたAPI会話履歴を取得します。
+            - `addToApiConversationHistory(message: Anthropic.MessageParam)`: API会話履歴にメッセージを追加します。
+            - `overwriteApiConversationHistory(newHistory: Anthropic.MessageParam[])`: API会話履歴を新しい履歴で上書きします。
+            - `saveApiConversationHistory()`: API会話履歴を保存します。
+            - `getSavedClineMessages()`: 保存されたClineメッセージを取得します。
+            - `addToClineMessages(message: ClineMessage)`: Clineメッセージを追加します。
+            - `overwriteClineMessages(newMessages: ClineMessage[])`: Clineメッセージを新しいメッセージで上書きします。
+            - `saveClineMessages()`: Clineメッセージを保存します。
+            - `restoreCheckpoint(messageTs: number, restoreType: ClineCheckpointRestore)`: チェックポイントを復元します。
+            - `presentMultifileDiff(messageTs: number, seeNewChangesSinceLastTaskCompletion: boolean)`: マルチファイルDiffを表示します。
+            - `doesLatestTaskCompletionHaveNewChanges()`: 最新のタスク完了以降に新しい変更があるかどうかを確認します。
+            - `ask(type: ClineAsk, text?: string, partial?: boolean)`: Webviewに質問を送信し、ユーザーからの応答を待ちます。
+            - `handleWebviewAskResponse(askResponse: ClineAskResponse, text?: string, images?: string[])`: Webviewからの質問応答を処理します。
+            - `say(type: ClineSay, text?: string, images?: string[], partial?: boolean)`: Webviewにメッセージを送信します。
+            - `sayAndCreateMissingParamError(toolName: ToolUseName, paramName: string, relPath?: string)`: 必須パラメータが欠落しているエラーメッセージをWebviewに送信します。
+            - `removeLastPartialMessageIfExistsWithType(type: "ask" | "say", askOrSay: ClineAsk | ClineSay)`: 指定されたタイプとask/sayの種類に一致する最後の部分メッセージを削除します。
+            - `startTask(task?: string, images?: string[])`: 新規タスクを開始します。
+            - `resumeTaskFromHistory()`: 履歴からタスクを再開します。
+            - `initiateTaskLoop(userContent: UserContent, isNewTask: boolean)`: タスク実行ループを開始します。
+            - `abortTask()`: タスクを中止します。
+            - `saveCheckpoint()`: チェックポイントを保存します。
+            - `executeCommandTool(command: string)`: コマンド実行ツールを実行します。
+            - `shouldAutoApproveTool(toolName: ToolUseName)`: ツールが自動承認されるべきかどうかを判断します。
+            - `attemptApiRequest(previousApiReqIndex: number)`: APIリクエストを試行します。
+            - `presentAssistantMessage()`: アシスタントメッセージをWebviewに表示します。
+            - `recursivelyMakeClineRequests(userContent: UserContent, includeFileDetails: boolean, isNewTask: boolean)`: Clineリクエストを再帰的に実行します。
+            - `loadContext(userContent: UserContent, includeFileDetails: boolean)`: コンテキストをロードします。
+            - `getEnvironmentDetails(includeFileDetails: boolean)`: 環境詳細を取得します。
+    - **core/assistant-message/**: アシスタントからのメッセージ解析と処理に関連するファイルが含まれています。
+    - **core/mentions/**: コードメンション機能に関連するファイルが含まれている可能性があります。
+    - **core/prompts/**: プロンプト管理に関連するファイルが含まれています。システムプロンプトやレスポンスプロンプトなどを定義する可能性があります。
+    - **core/sliding-window/**: スライディングウィンドウコンテキスト管理に関連するファイルが含まれている可能性があります。
+    - **core/webview/**: Webview (VS Code拡張機能内で表示されるWebページ) 関連のファイルが含まれています。
+- **exports/**: アプリケーションの公開API (`cline.d.ts`, `index.ts`) やドキュメント (`README.md`) を含むファイルが含まれています。
+- **integrations/**: VS Codeやその他のツールとの統合に関連する機能を提供するファイルが含まれています。
+    - **integrations/checkpoints/**: チェックポイント機能 (状態のスナップショットを保存・復元する機能) に関連するファイルが含まれている可能性があります。
+    - **integrations/debug/**: デバッグ機能に関連するファイルが含まれている可能性があります。
+    - **integrations/diagnostics/**: 診断機能 (エラー検出、警告表示など) に関連するファイルが含まれている可能性があります。
+    - **integrations/editor/**: VS Codeエディタとの統合に関連する機能 (装飾、Diff Viewなど) を提供するファイルが含まれています。
+    - **integrations/misc/**: その他の統合機能 (Markdownエクスポート、テキスト抽出、ファイルオープン、画像処理など) を提供するファイルが含まれています。
+    - **integrations/notifications/**: 通知機能 (VS Codeの通知表示) に関連するファイルが含まれている可能性があります。
+    - **integrations/terminal/**: VS Codeターミナルとの統合に関連する機能 (ターミナル管理、プロセス制御など) を提供するファイルが含まれています。
+    - **integrations/theme/**: テーマ機能 (VS Codeのテーマ適用) に関連するファイルが含まれています。
+    - **integrations/workspace/**: VS Codeワークスペースとの統合に関連する機能 (Python環境検出、ワークスペース追跡など) を提供するファイルが含まれています。
+- **services/**: アプリケーションで使用する各種サービス (認証、ブラウザ、グロブ、ロギング、MCP、ripgrep、Tree-sitter) の実装が含まれています。
+    - **services/auth/**: 認証サービス (Firebase認証など) に関連するファイルが含まれている可能性があります。
+    - **services/browser/**: ブラウザ関連サービス (ブラウザセッション管理、URLコンテンツ取得など) を提供するファイルが含まれています。
+    - **services/glob/**: グロブパターンによるファイルリスト機能を提供するファイル (`list-files.ts`) が含まれています。
+    - **services/logging/**: ロギングサービスを提供するファイル (`Logger.ts`) が含まれています。
+    - **services/mcp/**: MCP (Model Context Protocol) 関連サービスを提供するファイル (`McpHub.ts`) が含まれています。
+    - **services/ripgrep/**: ripgrep (高速なテキスト検索ツール) サービスを提供するファイル (`index.ts`) が含まれています。
+    - **services/tree-sitter/**: Tree-sitter (構文解析ツール) サービスを提供するファイルが含まれています。
+- **shared/**: 複数のモジュールで共有される型定義やユーティリティ関数などの共有ファイルが含まれています。
+- **test/**: テスト関連ファイルが含まれています。
+    - **test/extension.test.ts**: 拡張機能の統合テストファイル。
+    - **test/suite/**: テストスイート関連ファイル。
+    - **test/webview/**: Webview関連のテストファイル。
+- **utils/**: ユーティリティ関数 (コスト計算、ファイルシステム操作、パス操作、文字列操作など) を提供するファイルが含まれています。
+
+このドキュメントは、プロジェクトのソースコード構造の理解を助けるための概要です。各ファイルとディレクトリの詳細な機能については、それぞれのソースコードを参照してください。
