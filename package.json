@@ -53,6 +53,7 @@
 		"@types/node": "20.x",
 		"@types/should": "^11.2.0",
 		"@types/vscode": "^1.84.0",
+		"@types/yargs": "^17.0.33",
 		"@typescript-eslint/eslint-plugin": "^7.14.1",
 		"@typescript-eslint/parser": "^7.11.0",
 		"@vscode/test-cli": "^0.0.9",
@@ -106,6 +107,7 @@
 		"tree-sitter-wasms": "^0.1.11",
 		"turndown": "^7.2.0",
 		"web-tree-sitter": "^0.22.6",
+		"yargs": "^17.7.2",
 		"zod": "^3.23.8"
 	}
 }
