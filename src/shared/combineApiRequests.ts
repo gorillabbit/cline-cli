@@ -1,4 +1,4 @@
-import { ClineMessage } from "./ExtensionMessage"
+import { ClineMessage } from "../types.js"
 
 /**
  * Combines API request start and finish messages in an array of ClineMessages.

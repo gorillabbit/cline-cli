@@ -1,9 +1,9 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI, { AzureOpenAI } from "openai"
-import { ApiHandlerOptions, azureOpenAiDefaultApiVersion, ModelInfo, openAiModelInfoSaneDefaults } from "../../shared/api"
-import { ApiHandler } from "../index"
-import { convertToOpenAiMessages } from "../transform/openai-format"
-import { ApiStream } from "../transform/stream"
+import { ApiHandlerOptions, azureOpenAiDefaultApiVersion, ModelInfo, openAiModelInfoSaneDefaults } from "../../shared/api.js"
+import { ApiHandler } from "../index.js"
+import { convertToOpenAiMessages } from "../transform/openai-format.js"
+import { ApiStream } from "../transform/stream.js"
 
 export class OpenAiHandler implements ApiHandler {
 	private options: ApiHandlerOptions

@@ -1,4 +1,3 @@
-import type { OutputChannel } from "vscode"
 
 /**
  * Simple logging utility for the extension's backend code.
@@ -6,13 +5,8 @@ import type { OutputChannel } from "vscode"
  * to ensure proper registration with the extension context.
  */
 export class Logger {
-	private static outputChannel: OutputChannel
-
-	static initialize(outputChannel: OutputChannel) {
-		Logger.outputChannel = outputChannel
-	}
 
 	static log(message: string) {
-		Logger.outputChannel.appendLine(message)
+		console.log(message)
 	}
 }

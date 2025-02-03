@@ -1,8 +1,8 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import { Stream as AnthropicStream } from "@anthropic-ai/sdk/streaming"
-import { anthropicDefaultModelId, AnthropicModelId, anthropicModels, ApiHandlerOptions, ModelInfo } from "../../shared/api"
-import { ApiHandler } from "../index"
-import { ApiStream } from "../transform/stream"
+import { anthropicDefaultModelId, AnthropicModelId, anthropicModels, ApiHandlerOptions, ModelInfo } from "../../shared/api.js"
+import { ApiHandler } from "../index.js"
+import { ApiStream } from "../transform/stream.js"
 
 export class AnthropicHandler implements ApiHandler {
 	private options: ApiHandlerOptions

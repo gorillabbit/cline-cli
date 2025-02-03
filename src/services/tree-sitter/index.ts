@@ -1,8 +1,8 @@
 import * as fs from "fs/promises"
 import * as path from "path"
-import { listFiles } from "../glob/list-files"
-import { LanguageParser, loadRequiredLanguageParsers } from "./languageParser"
-import { fileExistsAtPath } from "../../utils/fs"
+import { listFiles } from "../glob/list-files.js"
+import { LanguageParser, loadRequiredLanguageParsers } from "./languageParser.js"
+import { fileExistsAtPath } from "../../utils/fs.js"
 
 // TODO: implement caching behavior to avoid having to keep analyzing project for new tasks.
 export async function parseSourceCodeForDefinitionsTopLevel(dirPath: string): Promise<string> {
@@ -23,29 +23,12 @@ export async function parseSourceCodeForDefinitionsTopLevel(dirPath: string): Pr
 	const languageParsers = await loadRequiredLanguageParsers(filesToParse)
 
 	// Parse specific files we have language parsers for
-	// const filesWithoutDefinitions: string[] = []
 	for (const file of filesToParse) {
 		const definitions = await parseFile(file, languageParsers)
 		if (definitions) {
 			result += `${path.relative(dirPath, file).toPosix()}\n${definitions}\n`
 		}
-		// else {
-		// 	filesWithoutDefinitions.push(file)
-		// }
 	}
-
-	// List remaining files' paths
-	// let didFindUnparsedFiles = false
-	// filesWithoutDefinitions
-	// 	.concat(remainingFiles)
-	// 	.sort()
-	// 	.forEach((file) => {
-	// 		if (!didFindUnparsedFiles) {
-	// 			result += "# Unparsed Files\n\n"
-	// 			didFindUnparsedFiles = true
-	// 		}
-	// 		result += `${path.relative(dirPath, file)}\n`
-	// 	})
 
 	return result ? result : "No source code definitions found."
 }
@@ -145,10 +128,6 @@ async function parseFile(filePath: string, languageParsers: LanguageParser): Pro
 				formattedOutput += `│${lines[startLine]}\n`
 			}
 			// Adds all the captured lines
-			// for (let i = startLine; i <= endLine; i++) {
-			// 	formattedOutput += `│${lines[i]}\n`
-			// }
-			//}
 
 			lastLine = endLine
 		})

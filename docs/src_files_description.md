@@ -19,16 +19,6 @@
     - **api/index.ts**: APIハンドラーのビルド関数 (`buildApiHandler`) を定義し、APIプロバイダーに基づいて適切なハンドラーを選択します。
         - `buildApiHandler(configuration: ApiConfiguration)`:  `ApiConfiguration`に基づいて適切な`ApiHandler`インスタンスを生成するファクトリ関数です。指定された`apiProvider`に基づいて、対応するAPIハンドラーのインスタンスを生成し返します。
     - **api/providers/**: 各APIプロバイダー (Anthropic, Bedrock, OpenRouter, Vertex, OpenAI, Ollama, LM Studio, Gemini, OpenAI Native, DeepSeek, Mistral, VS Code LM) のハンドラー実装が含まれています。各ファイルは、それぞれのAPIプロバイダーとの通信ロジックを実装します。
-        - **anthropic.ts**: Anthropic APIのハンドラー実装。
-            - `AnthropicHandler`: Anthropic APIを扱うクラス。
-                - `constructor(options: ApiHandlerOptions)`: コンストラクタ。APIキーなどのオプションを設定し、Anthropicクライアントを初期化します。
-                - `createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[])`: Anthropic APIを使用してメッセージストリームを作成する非同期ジェネレータ関数。プロンプトキャッシュを使用し、Anthropic APIにリクエストを送信して、応答ストリームを返します。
-                - `getModel()`: AnthropicモデルのIDと情報を返す関数。設定されたモデルIDまたはデフォルトモデルIDを返します。
-        - **bedrock.ts**: AWS Bedrock APIのハンドラー実装。
-            - `AwsBedrockHandler`: AWS Bedrock APIを扱うクラス。
-                - `constructor(options: ApiHandlerOptions)`: コンストラクタ。APIキーなどのオプションを設定し、Bedrockクライアントを初期化します。
-                - `createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[])`: AWS Bedrock APIを使用してメッセージストリームを作成する非同期ジェネレータ関数。Bedrock APIにリクエストを送信して、応答ストリームを返します。
-                - `getModel()`: BedrockモデルのIDと情報を返す関数。設定されたモデルIDまたはデフォルトモデルIDを返します。
     - **api/transform/**: APIからのストリームデータを変換・整形する処理を実装するファイルが含まれています。
 - **core/**: アプリケーションのコアロジックを実装するファイルが含まれています。
     - **core/Cline.ts**: アプリケーションの主要クラス `Cline` を定義します。Clineクラスは、アプリケーションの状態管理、APIハンドラーの保持、メッセージ処理などを担当します。
@@ -50,7 +40,7 @@
             - `doesLatestTaskCompletionHaveNewChanges()`: 最新のタスク完了以降に新しい変更があるかどうかを確認します。
             - `ask(type: ClineAsk, text?: string, partial?: boolean)`: Webviewに質問を送信し、ユーザーからの応答を待ちます。
             - `handleWebviewAskResponse(askResponse: ClineAskResponse, text?: string, images?: string[])`: Webviewからの質問応答を処理します。
-            - `say(type: ClineSay, text?: string, images?: string[], partial?: boolean)`: Webviewにメッセージを送信します。
+            - `await say(type: ClineSay, text?: string, images?: string[], partial?: boolean)`: Webviewにメッセージを送信します。
             - `sayAndCreateMissingParamError(toolName: ToolUseName, paramName: string, relPath?: string)`: 必須パラメータが欠落しているエラーメッセージをWebviewに送信します。
             - `removeLastPartialMessageIfExistsWithType(type: "ask" | "say", askOrSay: ClineAsk | ClineSay)`: 指定されたタイプとask/sayの種類に一致する最後の部分メッセージを削除します。
             - `startTask(task?: string, images?: string[])`: 新規タスクを開始します。

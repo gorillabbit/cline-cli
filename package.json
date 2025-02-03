@@ -25,16 +25,10 @@
 		"llama"
 	],
 	"main": "./build/index.js",
-	"bin": {
-		"cline": "./build/index.js"
-	},
+	"type": "module",
 	"scripts": {
-		"vscode:prepublish": "npm run package",
-		"compile": "npm run check-types && npm run lint && node esbuild.js",
-		"watch": "npm-run-all -p watch:*",
-		"watch:esbuild": "node esbuild.js --watch",
-		"watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-		"package": "npm run build:webview && npm run check-types && npm run lint && node esbuild.js --production",
+		"compile": "npm run check-types && npm run lint && tsc",
+		"package": "npm run build && npm run check-types && npm run lint",
 		"compile-tests": "tsc -p ./tsconfig.test.json --outDir out",
 		"watch-tests": "tsc -p . -w --outDir out",
 		"pretest": "npm run compile-tests && npm run compile && npm run lint",
@@ -65,6 +59,7 @@
 		"npm-run-all": "^4.1.5",
 		"prettier": "^3.3.3",
 		"should": "^13.2.3",
+		"ts-node": "^10.9.2",
 		"typescript": "^5.4.5"
 	},
 	"dependencies": {

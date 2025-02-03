@@ -1,8 +1,8 @@
-import * as vscode from "vscode"
 import * as childProcess from "child_process"
 import * as path from "path"
 import * as fs from "fs"
 import * as readline from "readline"
+import { globalStoragePath } from "../../const.js"
 
 /*
 This file provides functionality to perform regex searches on files using ripgrep.
@@ -123,7 +123,7 @@ async function execRipgrep(bin: string, args: string[]): Promise<string> {
 }
 
 export async function regexSearchFiles(cwd: string, directoryPath: string, regex: string, filePattern?: string): Promise<string> {
-	const vscodeAppRoot = vscode.env.appRoot
+	const vscodeAppRoot = globalStoragePath
 	const rgPath = await getBinPath(vscodeAppRoot)
 
 	if (!rgPath) {

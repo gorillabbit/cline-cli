@@ -7,9 +7,9 @@ import {
 	openAiNativeDefaultModelId,
 	OpenAiNativeModelId,
 	openAiNativeModels,
-} from "../../shared/api"
-import { convertToOpenAiMessages } from "../transform/openai-format"
-import { ApiStream } from "../transform/stream"
+} from "../../shared/api.js"
+import { convertToOpenAiMessages } from "../transform/openai-format.js"
+import { ApiStream } from "../transform/stream.js"
 
 export class OpenAiNativeHandler implements ApiHandler {
 	private options: ApiHandlerOptions

@@ -7,12 +7,9 @@ import {
 	MistralModelId,
 	mistralModels,
 	ModelInfo,
-	openAiNativeDefaultModelId,
-	OpenAiNativeModelId,
-	openAiNativeModels,
-} from "../../shared/api"
-import { convertToMistralMessages } from "../transform/mistral-format"
-import { ApiStream } from "../transform/stream"
+} from "../../shared/api.js"
+import { convertToMistralMessages } from "../transform/mistral-format.js"
+import { ApiStream } from "../transform/stream.js"
 
 export class MistralHandler implements ApiHandler {
 	private options: ApiHandlerOptions

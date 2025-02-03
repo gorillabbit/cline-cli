@@ -1,18 +1,17 @@
 import { Anthropic } from "@anthropic-ai/sdk"
-import { ApiConfiguration, ModelInfo } from "../shared/api"
-import { AnthropicHandler } from "./providers/anthropic"
-import { AwsBedrockHandler } from "./providers/bedrock"
-import { OpenRouterHandler } from "./providers/openrouter"
-import { VertexHandler } from "./providers/vertex"
-import { OpenAiHandler } from "./providers/openai"
-import { OllamaHandler } from "./providers/ollama"
-import { LmStudioHandler } from "./providers/lmstudio"
-import { GeminiHandler } from "./providers/gemini"
-import { OpenAiNativeHandler } from "./providers/openai-native"
+import { ApiConfiguration, ModelInfo } from "../shared/api.js"
+import { AnthropicHandler } from "./providers/anthropic.js"
+import { AwsBedrockHandler } from "./providers/bedrock.js"
+import { OpenRouterHandler } from "./providers/openrouter.js"
+import { VertexHandler } from "./providers/vertex.js"
+import { OpenAiHandler } from "./providers/openai.js"
+import { OllamaHandler } from "./providers/ollama.js"
+import { LmStudioHandler } from "./providers/lmstudio.js"
+import { GeminiHandler } from "./providers/gemini.js"
+import { OpenAiNativeHandler } from "./providers/openai-native.js"
 import { ApiStream } from "./transform/stream"
-import { DeepSeekHandler } from "./providers/deepseek"
-import { MistralHandler } from "./providers/mistral"
-import { VsCodeLmHandler } from "./providers/vscode-lm"
+import { DeepSeekHandler } from "./providers/deepseek.js"
+import { MistralHandler } from "./providers/mistral.js"
 
 export interface ApiHandler {
 	createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream
@@ -48,8 +47,6 @@ export function buildApiHandler(configuration: ApiConfiguration): ApiHandler {
 			return new DeepSeekHandler(options)
 		case "mistral":
 			return new MistralHandler(options)
-		case "vscode-lm":
-			return new VsCodeLmHandler(options)
 		default:
 			return new AnthropicHandler(options)
 	}

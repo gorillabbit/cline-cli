@@ -1,9 +1,9 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { ApiHandler } from ".."
-import { ApiHandlerOptions, geminiDefaultModelId, GeminiModelId, geminiModels, ModelInfo } from "../../shared/api"
-import { convertAnthropicMessageToGemini } from "../transform/gemini-format"
-import { ApiStream } from "../transform/stream"
+import { ApiHandlerOptions, geminiDefaultModelId, GeminiModelId, geminiModels, ModelInfo } from "../../shared/api.js"
+import { convertAnthropicMessageToGemini } from "../transform/gemini-format.js"
+import { ApiStream } from "../transform/stream.js"
 
 export class GeminiHandler implements ApiHandler {
 	private options: ApiHandlerOptions
@@ -22,10 +22,10 @@ export class GeminiHandler implements ApiHandler {
 			model: this.getModel().id,
 			systemInstruction: systemPrompt,
 		})
+		console.log("messages", messages, messages.map(convertAnthropicMessageToGemini))
 		const result = await model.generateContentStream({
 			contents: messages.map(convertAnthropicMessageToGemini),
 			generationConfig: {
-				// maxOutputTokens: this.getModel().info.maxTokens,
 				temperature: 0,
 			},
 		})
