@@ -108,8 +108,6 @@ async function main() {
     globalStateManager.updateState({ workspaceFolder })
     const apiProvider = (process.argv[4] ?? "openai") as ApiProvider
     const apiKey = process.argv[5]
-    console.log(`apiProvider: ${apiProvider}`)
-    console.log(`apiKey: ${apiKey}`)
     apiStateManager.updateState({ apiProvider, apiKey, geminiApiKey:apiKey })
 
     await ensureTaskDirectoryExists(taskId)
@@ -120,6 +118,8 @@ async function main() {
         },
     ];
     await recursivelyMakeClineRequests(userContent);
+    console.log("Cline requests completed")
+    process.exit(0)
 }
 
 main().catch((error) => {

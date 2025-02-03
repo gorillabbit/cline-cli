@@ -375,10 +375,12 @@ export const recursivelyMakeClineRequests = async (
                 })
             }
 
-            console.log(globalStateManager.getState().userMessageContent, "recursivelyMakeClineRequests: ユーザーメッセージを更新しました。")
+            console.log("recursivelyMakeClineRequests: ユーザーメッセージを更新しました。", globalStateManager.getState().userMessageContent)
 
-            const recDidEndLoop: boolean = await recursivelyMakeClineRequests(globalStateManager.getState().userMessageContent)
-            didEndLoop = recDidEndLoop
+            if (globalStateManager.getState().userMessageContent.length > 0) {
+                const recDidEndLoop: boolean = await recursivelyMakeClineRequests(globalStateManager.getState().userMessageContent)
+                didEndLoop = recDidEndLoop
+            }
         } else {
             // assistant_responsesが空の場合、モデルからテキストもツールも何も返ってこなかったことを意味するためエラー扱い
             await say(

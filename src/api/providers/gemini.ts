@@ -22,7 +22,6 @@ export class GeminiHandler implements ApiHandler {
 			model: this.getModel().id,
 			systemInstruction: systemPrompt,
 		})
-		console.log("messages", messages, messages.map(convertAnthropicMessageToGemini))
 		const result = await model.generateContentStream({
 			contents: messages.map(convertAnthropicMessageToGemini),
 			generationConfig: {

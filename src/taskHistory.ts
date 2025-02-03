@@ -49,10 +49,7 @@ const showTaskWithId = async (id: string) => {
         const { historyItem } = await getTaskWithId(id)
         initClineWithHistoryItem(historyItem) // clears existing task
     }
-    console.log({
-        type: "action",
-        action: "chatButtonClicked",
-    })
+    console.log("showTaskWithId", id)
 }
 
 const exportTaskWithId = async (id: string) => {

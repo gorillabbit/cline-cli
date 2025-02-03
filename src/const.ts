@@ -3,9 +3,6 @@ import path from "path"
 import os from "os";
 
 const homeDir = os.homedir();
-console.log(homeDir); // 例: "/home/username"
-
-
 export const globalStoragePath =path.join(homeDir, ".cline")
 
 export const taskBaseDir = path.join(globalStoragePath, "tasks")

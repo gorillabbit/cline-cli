@@ -273,10 +273,6 @@ export const say = async (type: ClineSay, text?: string, images?: string[], part
         lastMessage.text = text;
         lastMessage.images = images;
         lastMessage.partial = partial;
-        console.log({
-          type: "partialMessage",
-          partialMessage: lastMessage,
-        });
       } else {
         // 新しいpartialメッセージを追加
         const sayTs = Date.now();
@@ -301,10 +297,6 @@ export const say = async (type: ClineSay, text?: string, images?: string[], part
 
         // ディスクに保存
         saveClineMessages();
-        console.log({
-          type: "partialMessage",
-          partialMessage: lastMessage,
-        });
       } else {
         // 新しいメッセージとして追加
         const sayTs = Date.now();
