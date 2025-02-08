@@ -29,7 +29,7 @@ export const loadContext = async (userContent: UserContent, includeFileDetails: 
                     ) {
                         return {
                             ...block,
-                            text: await parseMentions(block.text, cwd()),
+                            text: await parseMentions(block.text, globalStateManager.state.workspaceFolder ?? cwd()),
                         }
                     }
                 }

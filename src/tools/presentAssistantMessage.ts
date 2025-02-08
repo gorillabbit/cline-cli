@@ -31,6 +31,9 @@ import { constructNewFileContent } from "../assistant-message/diff.js"
 export const presentAssistantMessage = async () => {
     const state = globalStateManager.state
     const genericDiffProvider = new GenericDiffProvider(state.workspaceFolder ?? "")
+    if (!state.workspaceFolder) {
+        throw new Error("Workspace folder not set")
+    }
 
     console.log("1:[プレゼント] 開始"); // ログ: 関数実行開始
 
@@ -301,7 +304,7 @@ export const presentAssistantMessage = async () => {
 
                         const sharedMessageProps: ClineSayTool = {
                             tool: fileExists ? "editedExistingFile" : "newFileCreated",
-                            path: getReadablePath(cwd(), removeClosingTag("path", relPath)),
+                            path: getReadablePath(state.workspaceFolder ?? "", removeClosingTag("path", relPath)),
                             content: diff || content,
                         }
 
@@ -431,7 +434,7 @@ export const presentAssistantMessage = async () => {
                     const recursive = recursiveRaw?.toLowerCase() === "true"
                     const sharedMessageProps: ClineSayTool = {
                         tool: !recursive ? "listFilesTopLevel" : "listFilesRecursive",
-                        path: getReadablePath(cwd(), removeClosingTag("path", relDirPath)),
+                        path: getReadablePath(state.workspaceFolder, removeClosingTag("path", relDirPath)),
                     }
                     try {
                         if (block.partial) {
@@ -455,7 +458,7 @@ export const presentAssistantMessage = async () => {
                                 break
                             }
                             state.consecutiveMistakeCount = 0
-                            const absolutePath = path.resolve(cwd(), relDirPath)
+                            const absolutePath = path.resolve(state.workspaceFolder, relDirPath)
                             const [files, didHitLimit] = await listFiles(absolutePath, recursive, 200)
                             const result = formatResponse.formatFilesList(absolutePath, files, didHitLimit)
                             const completeMessage = JSON.stringify({
@@ -480,7 +483,7 @@ export const presentAssistantMessage = async () => {
                     const relDirPath: string | undefined = block.params.path
                     const sharedMessageProps: ClineSayTool = {
                         tool: "listCodeDefinitionNames",
-                        path: getReadablePath(cwd(), removeClosingTag("path", relDirPath)),
+                        path: getReadablePath(state.workspaceFolder, removeClosingTag("path", relDirPath)),
                     }
                     try {
                         if (block.partial) {
@@ -503,7 +506,7 @@ export const presentAssistantMessage = async () => {
                                 break
                             }
                             state.consecutiveMistakeCount = 0
-                            const absolutePath = path.resolve(cwd(), relDirPath)
+                            const absolutePath = path.resolve(state.workspaceFolder, relDirPath)
                             const result = await parseSourceCodeForDefinitionsTopLevel(absolutePath)
                             const completeMessage = JSON.stringify({
                                 ...sharedMessageProps,
@@ -528,7 +531,7 @@ export const presentAssistantMessage = async () => {
                     const filePattern: string | undefined = block.params.file_pattern
                     const sharedMessageProps: ClineSayTool = {
                         tool: "searchFiles",
-                        path: getReadablePath(cwd(), removeClosingTag("path", relDirPath)),
+                        path: getReadablePath(state.workspaceFolder, removeClosingTag("path", relDirPath)),
                         regex: removeClosingTag("regex", regex),
                         filePattern: removeClosingTag("file_pattern", filePattern),
                     }
@@ -559,8 +562,8 @@ export const presentAssistantMessage = async () => {
                                 break
                             }
                             state.consecutiveMistakeCount = 0
-                            const absolutePath = path.resolve(cwd(), relDirPath)
-                            const results = await regexSearchFiles(cwd(), absolutePath, regex, filePattern)
+                            const absolutePath = path.resolve(state.workspaceFolder, relDirPath)
+                            const results = await regexSearchFiles(state.workspaceFolder, absolutePath, regex, filePattern)
                             const completeMessage = JSON.stringify({
                                 ...sharedMessageProps,
                                 content: results,
