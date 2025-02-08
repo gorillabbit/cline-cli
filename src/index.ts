@@ -2,13 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { log, logError } from './clineUtils.js';
 import { executeAiCommand, runCommand } from './command.js';
-import { recursivelyMakeClineRequests } from './tools.js';
 import { UserContent } from './types.js';
 import { ensureTaskDirectoryExists } from './tasks.js';
 import { randomUUID } from 'crypto';
 import { globalStateManager } from './globalState.js';
 import { apiStateManager } from './apiState.js';
 import { ApiProvider } from './shared/api.js';
+import { initiateTaskLoop, startTask } from './lifecycle.js';
 
 /**
  * callAiFixCode: ダミーの AI 修正関数
@@ -111,13 +111,7 @@ async function main() {
     apiStateManager.updateState({ apiProvider, apiKey, geminiApiKey:apiKey })
 
     await ensureTaskDirectoryExists(taskId)
-    const userContent: UserContent = [
-        {
-            type: "text",
-            text: instruction,
-        },
-    ];
-    await recursivelyMakeClineRequests(userContent);
+    await startTask(instruction);
     console.log("Cline requests completed")
     process.exit(0)
 }

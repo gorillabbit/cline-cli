@@ -5,20 +5,20 @@ import { extractTextFromFile } from "../integrations/misc/extract-text.js"
 import { mentionRegexGlobal } from "../shared/context-mentions.js"
 import { globalStateManager } from "../globalState.js"
 
-export function openMention(mention?: string): void {
+export async function openMention(mention?: string): Promise<void> {
 	if (!mention) {
 		return
 	}
 
 	if (mention.startsWith("/")) {
 		const relPath = mention.slice(1)
-		const cwd = globalStateManager.getState().workspaceFolder
+		const cwd = globalStateManager.state.workspaceFolder
 		if (!cwd) {
 			return
 		}
 		const absPath = path.resolve(cwd, relPath)
 		if (mention.endsWith("/")) {
-			fs.readdir(absPath)
+			await fs.readdir(absPath)
 		}
 	}
 }
@@ -59,7 +59,7 @@ export async function parseMentions(text: string, cwd: string): Promise<string> 
 			}
 		} else if (mention === "problems") {
 			try {
-				const problems = getWorkspaceProblems(cwd)
+				const problems = getWorkspaceProblems()
 				parsedText += `\n\n<workspace_diagnostics>\n${problems}\n</workspace_diagnostics>`
 			} catch (error) {
 				parsedText += `\n\n<workspace_diagnostics>\nError fetching diagnostics: ${error.message}\n</workspace_diagnostics>`
@@ -127,7 +127,7 @@ async function getFileOrFolderContent(mentionPath: string, cwd: string): Promise
 }
 
 // コードのエラーを取得する関数
-function getWorkspaceProblems(cwd: string) {
+function getWorkspaceProblems() {
 
 	throw new Error("Function not implemented.")
 }

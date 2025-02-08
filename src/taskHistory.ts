@@ -10,7 +10,7 @@ import { fileExistsAtPath } from "./utils/fs.js"
 import { globalStateManager } from "./globalState.js"
 import { abortTask } from "./lifecycle.js"
 
-const state = globalStateManager.getState()
+const state = globalStateManager.state
 
 export const getTaskWithId = async (id: string): Promise<{
     historyItem: HistoryItem

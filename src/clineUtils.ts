@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import { ToolUseName } from './assistant-message';
-import { globalStateManager } from './globalState.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { ClineMessage } from './types.js';
 
@@ -18,27 +17,7 @@ export function logError(message: string): void {
 }
 
 export const shouldAutoApproveTool = (toolName: ToolUseName): boolean => {
-	const state = globalStateManager.getState()
-	if (state.autoApprovalSettings.enabled) {
-		switch (toolName) {
-			case "read_file":
-			case "list_files":
-			case "list_code_definition_names":
-			case "search_files":
-				return state.autoApprovalSettings.actions.readFiles
-			case "write_to_file":
-			case "replace_in_file":
-				return state.autoApprovalSettings.actions.editFiles
-			case "execute_command":
-				return state.autoApprovalSettings.actions.executeCommands
-			case "browser_action":
-				return state.autoApprovalSettings.actions.useBrowser
-			case "access_mcp_resource":
-			case "use_mcp_tool":
-				return state.autoApprovalSettings.actions.useMcp
-		}
-	}
-	return false
+	return true
 }
 
 export function getTruncatedMessages(

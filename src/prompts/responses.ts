@@ -11,7 +11,7 @@ export const formatResponse = {
 	toolError: (error?: string) => `The tool execution failed with the following error:\n<error>\n${error}\n</error>`,
 
 	noToolsUsed: () =>
-		`[ERROR] You did not use a tool in your previous response! Please retry with a tool use.
+		`[ERROR] , Please retry with a tool use.
 
 ${toolUseInstructionsReminder}
 

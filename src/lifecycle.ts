@@ -6,21 +6,19 @@ import { findLastIndex } from "./shared/array.js"
 import { ClineApiReqInfo, ClineAsk, UserContent } from "./types.js"
 import { getSavedApiConversationHistory, getSavedClineMessages, overwriteApiConversationHistory, overwriteClineMessages, say } from "./tasks.js"
 import { ask } from "./chat.js"
-import { recursivelyMakeClineRequests } from "./tools.js"
+import { processClineRequests } from "./tools.js"
 import { findToolName } from "./integrations/misc/export-markdown.js"
 
-const startTask = async (task?: string, images?: string[]) => {
-    const state = globalStateManager.getState()
-    globalStateManager.updateState({
-        clineMessages: [], 
-        apiConversationHistory: [] 
-    })
+export const startTask = async (task?: string, images?: string[]) => {
+    console.log("Task started")
+    const state = globalStateManager.state
+    state.clineMessages = []
+    state.apiConversationHistory = []
     await say("text", task, images)
-
-    globalStateManager.updateState({ isInitialized: true })
+    state.isInitialized = true
 
     let imageBlocks: Anthropic.ImageBlockParam[] = formatResponse.imageBlocks(images)
-    initiateTaskLoop(
+    await initiateTaskLoop(
         [
             {
                 type: "text",
@@ -29,9 +27,11 @@ const startTask = async (task?: string, images?: string[]) => {
             ...imageBlocks,
         ]
     )
+    console.log("Task ended")
 }
 
 const resumeTaskFromHistory = async () => {
+    const state = globalStateManager.state
     const modifiedClineMessages = await getSavedClineMessages()
 
     // Remove any resume messages that may have been added before
@@ -57,14 +57,14 @@ const resumeTaskFromHistory = async () => {
     }
 
     await overwriteClineMessages(modifiedClineMessages)
-    
-    globalStateManager.updateState({ clineMessages:  await getSavedClineMessages() })
+
+    state.clineMessages = await getSavedClineMessages()
 
     // Now present the cline messages to the user and ask if they want to resume (NOTE: we ran into a bug before where the apiconversationhistory wouldnt be initialized when opening a old task, and it was because we were waiting for resume)
     // This is important in case the user deletes messages without resuming the task first
     
-    globalStateManager.updateState({ apiConversationHistory: await getSavedApiConversationHistory() })
-    const lastClineMessage = globalStateManager.getState().clineMessages
+    state.apiConversationHistory = await getSavedApiConversationHistory()
+    const lastClineMessage = state.clineMessages
         .slice()
         .reverse()
         .find((m) => !(m.ask === "resume_task" || m.ask === "resume_completed_task")) // could be multiple resume tasks
@@ -75,7 +75,7 @@ const resumeTaskFromHistory = async () => {
         askType = "resume_task"
     }
 
-    globalStateManager.updateState({ isInitialized: true })
+    state.isInitialized = true
 
     const { response, text, images } = await ask(askType) // calls poststatetowebview
     let responseText: string | undefined
@@ -223,7 +223,6 @@ const resumeTaskFromHistory = async () => {
     })()
 
     const wasRecent = lastClineMessage?.ts && Date.now() - lastClineMessage.ts < 30_000
-    const state = globalStateManager.getState()
 
     newUserContent.push({
         type: "text",
@@ -252,12 +251,12 @@ const resumeTaskFromHistory = async () => {
     initiateTaskLoop(newUserContent)
 }
 
-const initiateTaskLoop = async (userContent: UserContent) => {
+export const initiateTaskLoop = async (userContent: UserContent) => {
     let nextUserContent = userContent
     let includeFileDetails = true
-    const state = globalStateManager.getState()
+    const state = globalStateManager.state
     while (!state.abort) {
-        const didEndLoop = await recursivelyMakeClineRequests(nextUserContent, includeFileDetails)
+        const didEndLoop = await processClineRequests(nextUserContent, includeFileDetails)
         includeFileDetails = false // we only need file details the first time
         if (didEndLoop) {
             break
@@ -274,5 +273,5 @@ const initiateTaskLoop = async (userContent: UserContent) => {
 }
 
 export const abortTask = () => {
-    globalStateManager.updateState({ abort: true })
+    globalStateManager.state.abort = true
 }

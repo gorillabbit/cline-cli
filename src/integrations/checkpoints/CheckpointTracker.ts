@@ -40,7 +40,7 @@ class CheckpointTracker {
 	}
 
 	private static async getWorkingDirectory(): Promise<string> {
-		const state = globalStateManager.getState()
+		const state = globalStateManager.state
 		const cwd =state.workspaceFolder
 		if (!cwd) {
 			throw new Error("No workspace detected. Please open Cline in a workspace to use checkpoints.")

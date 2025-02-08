@@ -1,6 +1,5 @@
 import { AssistantMessageContent } from "./assistant-message/index.js";
 import CheckpointTracker from "./integrations/checkpoints/CheckpointTracker.js";
-import { AutoApprovalSettings } from "./shared/AutoApprovalSettings.js";
 import { ChatSettings } from "./shared/ChatSettings.js";
 import { HistoryItem } from "./shared/HistoryItem.js";
 import { ClineAskResponse, ClineMessage } from "./types.js";
@@ -21,8 +20,6 @@ export interface GlobalState {
   chatSettings: ChatSettings
   abort: boolean;
   consecutiveMistakeCount: number
-  autoApprovalSettings: AutoApprovalSettings
-  consecutiveAutoApprovedRequestsCount: number,
   checkpointTracker?: CheckpointTracker,
   checkpointTrackerErrorMessage?: string,
   workspaceFolder?: string,
@@ -50,30 +47,19 @@ export interface GlobalState {
   
 class GlobalStateManager {
   private static instance: GlobalStateManager;
-  private state: GlobalState = {
+
+  // ※ここだけ注意: 更新が反映されるよう、常に同じ this._state を使う
+  private _state: GlobalState = {
     clineMessages: [],
     apiConversationHistory: [],
     taskId: "",
     taskDir: "",
     taskHistory: [],
     chatSettings: {
-      mode: "act"
+      mode: "act",
     },
     abort: false,
     consecutiveMistakeCount: 0,
-    autoApprovalSettings: {
-      enabled: false,
-      actions: {
-        readFiles: false,
-        editFiles: false,
-        executeCommands: false,
-        useBrowser: false,
-        useMcp: false
-      },
-      maxRequests: 0,
-      enableNotifications: false,
-    },
-    consecutiveAutoApprovedRequestsCount: 0,
     didFinishAbortingStream: false,
     isWaitingForFirstChunk: false,
     isStreaming: false,
@@ -86,7 +72,7 @@ class GlobalStateManager {
     didRejectTool: false,
     didAlreadyUseTool: false,
     didCompleteReadingStream: false,
-    didAutomaticallyRetryFailedApiRequest: false
+    didAutomaticallyRetryFailedApiRequest: false,
   };
 
   private constructor() {}
@@ -98,12 +84,14 @@ class GlobalStateManager {
     return GlobalStateManager.instance;
   }
 
-  public getState(): GlobalState {
-    return this.state;
+  // state はゲッターで公開
+  public get state(): GlobalState {
+    return this._state;
   }
 
+  // 更新も同一オブジェクトに対して行う
   public updateState(newState: Partial<GlobalState>): void {
-    this.state = { ...this.state, ...newState };
+    Object.assign(this._state, newState);
   }
 }
 

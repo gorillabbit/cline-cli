@@ -8,7 +8,7 @@ import { globalStateManager } from "../globalState.js"
  */
 export const doesLatestTaskCompletionHaveNewChanges = async () => {
     console.log("doesLatestTaskCompletionHaveNewChanges started"); // Log: Function execution start
-    const state = globalStateManager.getState()
+    const state = globalStateManager.state
     const messageIndex = findLastIndex(state.clineMessages, (m) => m.say === "completion_result")
     const message = state.clineMessages[messageIndex]
     if (!message) {

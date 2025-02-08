@@ -12,10 +12,10 @@ import { UserContent } from "../types.js"
  * コンテキスト情報（解析されたユーザーコンテンツ、環境詳細など）をロードします。
  * @param {UserContent} userContent - コンテキストをロードするユーザーコンテンツ。
  * @param {boolean} [includeFileDetails=false] - 環境コンテキストにファイルの詳細を含めるかどうか。
- * @returns {Promise<[Promise<Anthropic.Messages.ContentBlockParam[]>[], string]>} - 解析されたユーザーコンテンツと環境詳細。
+ * @returns 解析されたユーザーコンテンツと環境詳細。
  */
 export const loadContext = async (userContent: UserContent, includeFileDetails: boolean = false) => {
-    console.log("loadContext started"); // ログ：関数実行開始
+    console.log("1:[loadContext] started"); // ログ：関数実行開始
     const result = await Promise.all([
         Promise.all(
             userContent.map(async (block) => {
@@ -39,49 +39,33 @@ export const loadContext = async (userContent: UserContent, includeFileDetails: 
         ),
         getEnvironmentDetails(includeFileDetails),
     ])
-    console.log("loadContext finished"); // ログ：関数実行終了
+    console.log("2:[loadContext] finished"); // ログ：関数実行終了
     return result
 }
 
 /**
  * 環境詳細（現在の時刻、作業ディレクトリのファイル、現在のモードなど）を取得します。
  * @param {boolean} [includeFileDetails=false] - ファイルの詳細を含めるかどうか.
- * @returns {Promise<string>} - 環境詳細を文字列としてフォーマットしたもの.
+ * @returns 環境詳細を文字列としてフォーマットしたもの.
  */
-export const getEnvironmentDetails = async (includeFileDetails: boolean = false) => {
-    console.log("getEnvironmentDetails started"); // ログ：関数実行開始
+export const getEnvironmentDetails = async (includeFileDetails: boolean = false): Promise<string> => {
+    console.log("1:[getEnvironmentDetails] started includeFileDetails:", includeFileDetails); // ログ：関数実行開始
     let details = ""
 
-    const state = globalStateManager.getState()
-    // waiting for updated diagnostics lets terminal output be the most up-to-date possible
-    let terminalDetails = ""
-
-    // Add current time information with timezone
-    const now = new Date()
-    const formatter = new Intl.DateTimeFormat(undefined, {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "numeric",
-        minute: "numeric",
-        second: "numeric",
-        hour12: true,
-    })
-    const timeZone = formatter.resolvedOptions().timeZone
-    const timeZoneOffset = -now.getTimezoneOffset() / 60 // Convert to hours and invert sign to match conventional notation
-    const timeZoneOffsetStr = `${timeZoneOffset >= 0 ? "+" : ""}${timeZoneOffset}:00`
-    details += `\n\n# Current Time\n${formatter.format(now)} (${timeZone}, UTC${timeZoneOffsetStr})`
+    const state = globalStateManager.state
 
     if (includeFileDetails) {
-        details += `\n\n# Current Working Directory (${cwd()}) Files\n`
-        const isDesktop = arePathsEqual(cwd(), path.join(os.homedir(), "Desktop"))
+        details += `\n\n# Current Working Directory (${state.workspaceFolder}) Files\n`
+        const isDesktop = arePathsEqual(state.workspaceFolder, path.join(os.homedir(), "Desktop"))
         if (isDesktop) {
             // don't want to immediately access desktop since it would show permission popup
             details += "(Desktop files not shown automatically. Use list_files to explore if needed.)"
         } else {
-            const [files, didHitLimit] = await listFiles(cwd(), true, 200)
-            const result = formatResponse.formatFilesList(cwd(), files, didHitLimit)
-            details += result
+            if (state.workspaceFolder) {
+                const [files, didHitLimit] = await listFiles(state.workspaceFolder, true, 200)
+                const result = formatResponse.formatFilesList(state.workspaceFolder, files, didHitLimit)
+                details += result
+            }
         }
     }
 
@@ -96,6 +80,6 @@ export const getEnvironmentDetails = async (includeFileDetails: boolean = false)
         details += "\nACT MODE"
     }
 
-    console.log("getEnvironmentDetails finished"); // Log: Function execution finish
+    console.log("2:[getEnvironmentDetails] finished"); // Log: Function execution finish
     return `<environment_details>\n${details.trim()}\n</environment_details>`
 }

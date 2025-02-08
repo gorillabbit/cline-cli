@@ -11,7 +11,6 @@ import { combineApiRequests } from './shared/combineApiRequests.js';
 import { HistoryItem } from './shared/HistoryItem.js';
 import { formatResponse } from './prompts/responses.js';
 import { combineCommandSequences } from './clineUtils.js';
-import c from './services/tree-sitter/queries/c.js';
 
 /**
  * 指定したtaskIdに対応するタスクディレクトリを作成し、必要なファイルを準備します。
@@ -48,18 +47,12 @@ export const ensureTaskDirectoryExists = async (
  * @returns {Promise<Anthropic.MessageParam[]>} - 保存されているAPI会話履歴の配列
  */
 export const getSavedApiConversationHistory = async (): Promise<Anthropic.MessageParam[]> => {
-  const taskDir = globalStateManager.getState().taskDir;
+  const taskDir = globalStateManager.state.taskDir;
   const filePath = path.join(
     taskDir,
     GlobalFileNames.apiConversationHistory
   );
-  const fileExists = fileExistsAtPath(filePath);
-  if (fileExists) {
-    // ファイルが存在する場合はJSONを読み込んで返す
-    return JSON.parse(await fs.readFile(filePath, "utf8"));
-  }
-  // 存在しない場合は空配列を返す
-  return [];
+  return JSON.parse(await fs.readFile(filePath, "utf8"));
 };
 
 /**
@@ -94,7 +87,7 @@ const saveApiConversationHistory = async (
   apiConversationHistory: Anthropic.MessageParam[],
 ) => {
   try {
-    const taskDir = globalStateManager.getState().taskDir;
+    const taskDir = globalStateManager.state.taskDir;
     const filePath = path.join(
       taskDir,
       GlobalFileNames.apiConversationHistory
@@ -108,34 +101,15 @@ const saveApiConversationHistory = async (
 };
 
 /**
- * 指定されたパスのファイルが存在するかどうかを確認する関数（仮実装）
- * @param {string} filePath - ファイルパス
- * @returns {boolean} - ファイルが存在すればtrue、存在しなければfalse
- */
-const fileExistsAtPath = (filePath: string): boolean => {
-  try {
-    fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-/**
  * 保存されたClineメッセージを取得する関数
  * @returns {Promise<ClineMessage[]>} - Clineメッセージの配列
  */
 export const getSavedClineMessages = async (): Promise<ClineMessage[]> => {
-  const taskDir = globalStateManager.getState().taskDir;
-
+  const taskDir = globalStateManager.state.taskDir;
   const filePath = path.join(taskDir, GlobalFileNames.uiMessages);
-  console.log("filePath", filePath);
-  if (fileExistsAtPath(filePath)) {
-    // ファイルが存在する場合は読み込む
-    return JSON.parse(await fs.readFile(filePath, "utf8"));
-  }
-  // 存在しない場合は空の配列を返す
-  return [];
+  const file = await fs.readFile(filePath, "utf8");
+  console.log("[clineメッセージを取得する] ファイルが存在する", filePath, JSON.parse(file));
+  return JSON.parse(file);
 };
 
 /**
@@ -146,16 +120,22 @@ export const addToClineMessages = async (
   message: ClineMessage
 ) => {
   // conversationHistoryIndexを現在のAPI会話履歴数 - 1 に設定（最後のユーザーメッセージを指す想定）
-  message.conversationHistoryIndex = globalStateManager.getState().apiConversationHistory.length - 1;
-  message.conversationHistoryDeletedRange = globalStateManager.getState().conversationHistoryDeletedRange;
+  const state = globalStateManager.state;
+  message.conversationHistoryIndex = state.apiConversationHistory.length - 1;
+  message.conversationHistoryDeletedRange = state.conversationHistoryDeletedRange;
+
+  console.log("1:[addToClineMessages] メッセージ:", message)
+  if (message.type === "say" && !message.text) {
+    return;
+  }
 
   const clineMessages = await getSavedClineMessages();
   clineMessages.push(message);
 
   // グローバルステートにも反映
-  globalStateManager.updateState({ clineMessages });
+  state.clineMessages = clineMessages;
   await saveClineMessages();
-  console.log("saveClineMessages を完了しました:", message);
+  console.log("2:[addToClineMessages] saveClineMessages を完了しました");
 };
 
 /**
@@ -174,14 +154,14 @@ export const overwriteClineMessages = async (
  */
 export const saveClineMessages = async () => {
   try {
-    const taskDir = globalStateManager.getState().taskDir;
+    const state = globalStateManager.state;
+    const taskDir = state.taskDir;
     const filePath = path.join(taskDir, GlobalFileNames.uiMessages);
-    const state = globalStateManager.getState();
     const clineMessages = state.clineMessages;
 
     // ClineメッセージをファイルにJSONとして書き込み
     await fs.writeFile(filePath, JSON.stringify(clineMessages));
-    console.log("Clineメッセージを保存しました:", filePath);
+    console.log("1:[message保存] Clineメッセージを保存しました:", filePath);
 
     // ChatView上で結合されるのと同様にAPIメトリクスを取得
     const apiMetrics = getApiMetrics(
@@ -205,7 +185,7 @@ export const saveClineMessages = async () => {
       // バイト数が返るので、size / 1000 / 1000 でMB換算可能
       taskDirSize = await getFolderSize.loose(taskDir);
     } catch (error) {
-      console.error("タスクディレクトリのサイズ取得に失敗しました:", taskDir, error);
+      console.error("1.5:[saveClineMessages] タスクディレクトリのサイズ取得に失敗しました:", taskDir, error);
     }
 
     // ヒストリーを更新
@@ -221,9 +201,9 @@ export const saveClineMessages = async () => {
       size: taskDirSize,
       conversationHistoryDeletedRange: state.conversationHistoryDeletedRange,
     });
-    console.log("Clineメッセージの保存とタスクヒストリーの更新が完了しました");
+    console.log("2:[saveClineMessages] Clineメッセージの保存とタスクヒストリーの更新が完了しました");
   } catch (error) {
-    console.error("Clineメッセージの保存に失敗しました:", error);
+    console.error("2:[saveClineMessages] Clineメッセージの保存に失敗しました:", error);
   }
 };
 
@@ -233,7 +213,8 @@ export const saveClineMessages = async () => {
  * @returns {HistoryItem[]} - 更新後のタスク履歴配列
  */
 const updateTaskHistory = (item: HistoryItem): HistoryItem[] => {
-  const history = globalStateManager.getState().taskHistory;
+
+  const history = globalStateManager.state.taskHistory;
   const existingItemIndex = history.findIndex((h) => h.id === item.id);
 
   if (existingItemIndex !== -1) {
@@ -243,8 +224,6 @@ const updateTaskHistory = (item: HistoryItem): HistoryItem[] => {
     // ない場合は新規に追加
     history.push(item);
   }
-
-  globalStateManager.updateState({ taskHistory: history });
   return history;
 };
 
@@ -258,8 +237,8 @@ const updateTaskHistory = (item: HistoryItem): HistoryItem[] => {
  * @param {boolean} [partial] - partialフラグ。trueの場合はストリーミング中の未完成メッセージを扱う
  */
 export const say = async (type: ClineSay, text?: string, images?: string[], partial?: boolean) => {
+  const state = globalStateManager.state;
   if (partial !== undefined) {
-    const state = globalStateManager.getState();
     const lastMessage = state.clineMessages.at(-1);
 
     // 直近のメッセージがpartial状態＆同じtypeの場合は更新を行う
@@ -276,7 +255,7 @@ export const say = async (type: ClineSay, text?: string, images?: string[], part
       } else {
         // 新しいpartialメッセージを追加
         const sayTs = Date.now();
-        globalStateManager.updateState({ lastMessageTs: sayTs });
+        state.lastMessageTs = sayTs;
         await addToClineMessages({
           ts: sayTs,
           type: "say",
@@ -290,7 +269,7 @@ export const say = async (type: ClineSay, text?: string, images?: string[], part
       // partialがfalseの場合、既存のpartialメッセージを完成版に置き換える
       if (isUpdatingPreviousPartial) {
         // 既存のpartialメッセージを完成形に更新
-        globalStateManager.updateState({ lastMessageTs: lastMessage.ts });
+        state.lastMessageTs = lastMessage.ts;
         lastMessage.text = text;
         lastMessage.images = images;
         lastMessage.partial = false;
@@ -300,7 +279,7 @@ export const say = async (type: ClineSay, text?: string, images?: string[], part
       } else {
         // 新しいメッセージとして追加
         const sayTs = Date.now();
-        globalStateManager.updateState({ lastMessageTs: sayTs });
+        state.lastMessageTs = sayTs;
         await addToClineMessages({
           ts: sayTs,
           type: "say",
@@ -313,7 +292,7 @@ export const say = async (type: ClineSay, text?: string, images?: string[], part
   } else {
     // partialが指定されていない通常メッセージの場合
     const sayTs = Date.now();
-    globalStateManager.updateState({ lastMessageTs: sayTs });
+    state.lastMessageTs = sayTs;
     await addToClineMessages({
       ts: sayTs,
       type: "say",
@@ -329,9 +308,9 @@ export const say = async (type: ClineSay, text?: string, images?: string[], part
  * @param {ToolUseName} toolName - ツール名
  * @param {string} paramName - 欠けているパラメータ名
  * @param {string} [relPath] - 関連ファイルパス（任意）
- * @returns {string} - フォーマットされたエラーメッセージ（再試行用）
+ * @returns {Promise<string>} - フォーマットされたエラーメッセージ（再試行用）
  */
-export const sayAndCreateMissingParamError = async (toolName: ToolUseName, paramName: string, relPath?: string) => {
+export const sayAndCreateMissingParamError = async (toolName: ToolUseName, paramName: string, relPath?: string): Promise<string> => {
   await say(
     "error",
     `Clineは${toolName}を使用しようとしましたが、必須パラメータ'${paramName}'に値がありません。${
@@ -347,7 +326,7 @@ export const sayAndCreateMissingParamError = async (toolName: ToolUseName, param
  * @param {ClineAsk | ClineSay} askOrSay - "ask"または"say"の具体的な値
  */
 export const removeLastPartialMessageIfExistsWithType = (type: "ask" | "say", askOrSay: ClineAsk | ClineSay) => {
-  const clineMessages = globalStateManager.getState().clineMessages;
+  const clineMessages = globalStateManager.state.clineMessages;
   const lastMessage = clineMessages.at(-1);
   if (
     lastMessage?.partial &&

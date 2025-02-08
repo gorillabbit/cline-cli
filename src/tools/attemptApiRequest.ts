@@ -1,232 +1,221 @@
-import delay from "delay"
-import path from "path"
-import fs from "fs/promises"
-import { serializeError } from "serialize-error"
-import { cwd } from "process"
-import { OpenRouterHandler } from "../api/providers/openrouter.js"
-import { OpenAiHandler } from "../api/providers/openai.js"
-import { ask } from "../chat.js"
-import { getTruncatedMessages } from "../clineUtils.js"
-import { GlobalFileNames } from "../const.js"
-import { globalStateManager } from "../globalState.js"
-import { SYSTEM_PROMPT, addUserInstructions } from "../prompts/system.js"
-import { saveClineMessages, say } from "../tasks.js"
-import { ClineApiReqInfo } from "../types.js"
-import { fileExistsAtPath } from "../utils/fs.js"
-import Anthropic from "@anthropic-ai/sdk"
-import { apiStateManager } from "../apiState.js"
-import { buildApiHandler } from "../api/index.js"
+import delay from "delay";
+import path from "path";
+import fs from "fs/promises";
+import { serializeError } from "serialize-error";
+import { cwd } from "process";
+import { OpenRouterHandler } from "../api/providers/openrouter.js";
+import { OpenAiHandler } from "../api/providers/openai.js";
+import { ask } from "../chat.js";
+import { getTruncatedMessages } from "../clineUtils.js";
+import { GlobalFileNames } from "../const.js";
+import { globalStateManager } from "../globalState.js";
+import { SYSTEM_PROMPT, addUserInstructions } from "../prompts/system.js";
+import { saveClineMessages, say } from "../tasks.js";
+import { ClineApiReqInfo } from "../types.js";
+import { fileExistsAtPath } from "../utils/fs.js";
+import Anthropic from "@anthropic-ai/sdk";
+import { apiStateManager } from "../apiState.js";
+import { buildApiHandler } from "../api/index.js";
 
 /**
- * OpenRouterの失敗に対して再試行するロジックを備えたAPIリクエストを試みる関数です。  
- * まず最初のチャンクを読み取り、失敗した場合は自動再試行を行い、  
- * それでも失敗した場合にはユーザーに再試行の可否を確認します。
- *
- * @param {number} previousApiReqIndex - 前回のAPIリクエストのインデックス
- * @returns {AsyncGenerator<any, void, unknown>} - ストリーミングされるAPIチャンクを返すAsyncGenerator
+ * APIリクエスト用のシステムプロンプトを構築する
  */
-export const attemptApiRequest = async function* (
-  previousApiReqIndex: number
-): AsyncGenerator<any, void, unknown> {
-  console.log("[attemptApiRequest] 開始：APIリクエストを試行します。"); // ログ：関数実行開始
+async function buildSystemPrompt(): Promise<string> {
+  const apiHandler = buildApiHandler(apiStateManager.getState());
+  const state = globalStateManager.state;
+  if (!state.workspaceFolder) {
+    throw new Error("Workspace folder not set");
+  }
+  let prompt = await SYSTEM_PROMPT(state.workspaceFolder, apiHandler.getModel().info.supportsComputerUse ?? false);
+  
+  // ユーザー固有の設定
+  const customInstructions = state.customInstructions?.trim();
+  const clineRulesFilePath = path.resolve(state.workspaceFolder, GlobalFileNames.clineRules);
+  let clineRulesInstructions: string | undefined;
 
-  // 現在のグローバルステートを取得
-  const state = globalStateManager.getState();
-  const apiState = apiStateManager.getState()
-  const apiHandler = buildApiHandler(apiStateManager.getState())
-
-  // システムプロンプトを構築
-  let systemPrompt = await SYSTEM_PROMPT(
-    cwd(),
-    apiHandler.getModel().info.supportsComputerUse ?? false
-  );
-  console.log("[attemptApiRequest] システムプロンプトを取得しました。");
-
-  // ユーザー固有の設定や .clinerules があれば付与
-  let settingsCustomInstructions = globalStateManager.getState().customInstructions?.trim();
-  const clineRulesFilePath = path.resolve(cwd(), GlobalFileNames.clineRules);
-  let clineRulesFileInstructions: string | undefined;
-
-  // .clinerulesファイルの読み込み
+  // .clinerulesファイルの内容を読み込む
   if (await fileExistsAtPath(clineRulesFilePath)) {
     try {
       const ruleFileContent = (await fs.readFile(clineRulesFilePath, "utf8")).trim();
       if (ruleFileContent) {
-        clineRulesFileInstructions = `# .clinerules\n\nThe following is provided by a root-level .clinerules file where the user has specified instructions for this working directory (${cwd()})\n\n${ruleFileContent}`;
-        console.log("[attemptApiRequest] .clinerulesファイルの内容を取得しました。");
+        clineRulesInstructions = `# .clinerules\n\nThe following instructions are provided by the .clinerules file for this working directory (${state.workspaceFolder}):\n\n${ruleFileContent}`;
+        console.log("[buildSystemPrompt] .clinerulesの内容を取得しました。");
       }
     } catch (error) {
-      console.error(`[attemptApiRequest] .clinerulesファイルの読み込みに失敗しました: ${clineRulesFilePath}`, error);
+      console.error(`[buildSystemPrompt] .clinerulesファイルの読み込みに失敗しました: ${clineRulesFilePath}`, error);
     }
   }
 
-  // システムプロンプトへユーザー指示や.clinerulesの内容を追加
-  if (settingsCustomInstructions || clineRulesFileInstructions) {
-    systemPrompt += addUserInstructions(settingsCustomInstructions, clineRulesFileInstructions);
-    console.log("[attemptApiRequest] システムプロンプトにユーザー指示を追加しました。");
+  // ユーザー設定および.clinerulesの内容をプロンプトに追加
+  if (customInstructions || clineRulesInstructions) {
+    prompt += addUserInstructions(customInstructions, clineRulesInstructions);
+    console.log("[buildSystemPrompt] ユーザー指示をシステムプロンプトに追加しました。");
   }
+  return prompt;
+}
 
-  // 前回のAPIリクエストでトークン使用量がコンテキストウィンドウに近い場合、履歴をトリミングする
-  if (previousApiReqIndex >= 0) {
-    const previousRequest = state.clineMessages[previousApiReqIndex];
-    if (previousRequest && previousRequest.text) {
-      const { tokensIn, tokensOut, cacheWrites, cacheReads }: ClineApiReqInfo = JSON.parse(previousRequest.text);
-      const totalTokens = (tokensIn || 0) + (tokensOut || 0) + (cacheWrites || 0) + (cacheReads || 0);
+/**
+ * コンテキストウィンドウサイズに応じた最大許容トークン数を計算する
+ */
+function getMaxAllowedTokens(apiHandler: ReturnType<typeof buildApiHandler>): number {
+  // 基本はコンテキストサイズに応じたマージンを引く
+  let contextWindow = apiHandler.getModel().info.contextWindow || 128_000;
+  if (apiHandler instanceof OpenAiHandler && apiHandler.getModel().id.toLowerCase().includes("deepseek")) {
+    contextWindow = 64_000;
+  }
+  switch (contextWindow) {
+    case 64_000:
+      return contextWindow - 27_000;
+    case 128_000:
+      return contextWindow - 30_000;
+    case 200_000:
+      return contextWindow - 40_000;
+    default:
+      return Math.max(contextWindow - 40_000, contextWindow * 0.8);
+  }
+}
 
-      // モデルのコンテキストウィンドウサイズを取得
-      let contextWindow = apiHandler.getModel().info.contextWindow || 128_000;
-      if (
-        apiHandler instanceof OpenAiHandler &&
-        apiHandler.getModel().id.toLowerCase().includes("deepseek")
-      ) {
-        contextWindow = 64_000; // DeepSeekモデルの場合
-      }
+/**
+ * 前回のリクエストのトークン使用量を確認し、必要なら会話履歴のトリミングを行う
+ */
+async function trimHistoryIfNeeded(previousApiReqIndex: number): Promise<void> {
+  const state = globalStateManager.state;
+  if (previousApiReqIndex < 0) {return;}
 
-      // トリミングの閾値を計算
-      let maxAllowedSize: number;
-      switch (contextWindow) {
-        case 64_000: // DeepSeekモデル
-          maxAllowedSize = contextWindow - 27_000;
-          break;
-        case 128_000: // 大多数のモデル
-          maxAllowedSize = contextWindow - 30_000;
-          break;
-        case 200_000: // Claudeモデル
-          maxAllowedSize = contextWindow - 40_000;
-          break;
-        default:
-          // デフォルトは8割を超えると大きいとみなす
-          maxAllowedSize = Math.max(contextWindow - 40_000, contextWindow * 0.8);
-      }
+  const previousRequest = state.clineMessages[previousApiReqIndex];
+  if (previousRequest?.text) {
+    const { tokensIn, tokensOut, cacheWrites, cacheReads }: ClineApiReqInfo = JSON.parse(previousRequest.text);
+    const totalTokens = (tokensIn || 0) + (tokensOut || 0) + (cacheWrites || 0) + (cacheReads || 0);
 
-      console.log(
-        `[attemptApiRequest] トークン合計: ${totalTokens} / コンテキストウィンドウ: ${contextWindow}, トリミング閾値: ${maxAllowedSize}`
+    const apiHandler = buildApiHandler(apiStateManager.getState());
+    const maxAllowed = getMaxAllowedTokens(apiHandler);
+
+    console.log(`[trimHistoryIfNeeded] トークン合計: ${totalTokens} / 最大許容: ${maxAllowed}, テキスト: ${previousRequest.text}`);
+    if (totalTokens >= maxAllowed) {
+      console.log("[trimHistoryIfNeeded] コンテキストウィンドウに近づいたため、履歴をトリミングします。");
+      const keep = totalTokens / 2 > maxAllowed ? "quarter" : "half";
+      const newRange = getNextTruncationRange(
+        state.apiConversationHistory,
+        state.conversationHistoryDeletedRange,
+        keep
       );
-
-      // totalTokensが閾値を超えた場合、会話履歴を一部削除
-      if (totalTokens >= maxAllowedSize) {
-        console.log("[attemptApiRequest] コンテキストウィンドウに近づいているため、履歴をトリミングします。");
-        // ユーザーが別のモデルに切り替えた場合にも対応して、半分で足りなければ4分の1だけ残すなど動的に判断
-        const keep = totalTokens / 2 > maxAllowedSize ? "quarter" : "half";
-        globalStateManager.updateState({
-            conversationHistoryDeletedRange: getNextTruncationRange(
-                globalStateManager.getState().apiConversationHistory,
-                globalStateManager.getState().conversationHistoryDeletedRange,
-                keep
-            ),
-            });
-        // タスク履歴項目を保存して会話履歴の削除範囲を追跡
-        await saveClineMessages();
-      }
+      state.conversationHistoryDeletedRange = newRange;
+      await saveClineMessages();
     }
   }
+}
 
-  // 会話履歴の削除範囲に基づいてトリミングされた履歴を取得
-  const truncatedConversationHistory = getTruncatedMessages(
-    globalStateManager.getState().apiConversationHistory,
-    globalStateManager.getState().conversationHistoryDeletedRange
+/**
+ * attemptApiRequest
+ * APIリクエストの最初のチャンク取得を試み、失敗時は自動再試行またはユーザーに再試行可否を問い合わせます。
+ *
+ * @param previousApiReqIndex 前回のAPIリクエストのインデックス
+ */
+export async function* attemptApiRequest(
+  previousApiReqIndex: number
+): AsyncGenerator<any, void, unknown> {
+  console.log("1:[attemptApiRequest] APIリクエストを開始します。previousApiReqIndex:", previousApiReqIndex);
+
+  const state = globalStateManager.state;
+  const apiHandler = buildApiHandler(apiStateManager.getState());
+
+  // システムプロンプト構築
+  const systemPrompt = await buildSystemPrompt();
+  console.log("2:[attemptApiRequest] システムプロンプトを構築しました。");
+
+  // 履歴トリミングの必要があれば実施
+  await trimHistoryIfNeeded(previousApiReqIndex);
+
+  // トリミング済みの会話履歴を取得
+  const truncatedHistory = getTruncatedMessages(
+    state.apiConversationHistory,
+    state.conversationHistoryDeletedRange
   );
-  console.log("[attemptApiRequest] 履歴をトリミングしました。");
+  console.log("3:[attemptApiRequest] 会話履歴をトリミングしました。");
 
   // ストリーム生成
-  let stream = apiHandler.createMessage(systemPrompt, truncatedConversationHistory);
-  console.log("[attemptApiRequest] ストリームを生成しました。");
+  const stream = apiHandler.createMessage(systemPrompt, truncatedHistory);
   const iterator = stream[Symbol.asyncIterator]();
+  console.log("4:[attemptApiRequest] ストリームを生成しました。", iterator);
 
+  // 最初のチャンク取得（失敗時は再試行またはユーザー問い合わせ）
   try {
-    // 最初のチャンクを読み込み、エラーが発生しないかチェック
-    console.log("[attemptApiRequest] 最初のチャンクを待機します。");
-    globalStateManager.updateState({ isWaitingForFirstChunk: true });
+    console.log("5:[attemptApiRequest] 最初のチャンクを待機中…");
+    state.isWaitingForFirstChunk = true;
     const firstChunk = await iterator.next();
     yield firstChunk.value;
-    console.log("[attemptApiRequest] 最初のチャンク受信。ストリーム続行。");
-    globalStateManager.updateState({ isWaitingForFirstChunk: false });
+    console.log("6:[attemptApiRequest] 最初のチャンクを受信しました。");
+    state.isWaitingForFirstChunk = false;
   } catch (error) {
     const isOpenRouter = apiStateManager.getState() instanceof OpenRouterHandler;
-    // OpenRouterの場合、最初の失敗時に自動再試行する
     if (isOpenRouter && !state.didAutomaticallyRetryFailedApiRequest) {
-      console.log("[attemptApiRequest] 最初のチャンク取得に失敗。1秒待機後に再試行します。", error);
+      console.log("6:[attemptApiRequest] 最初のチャンク取得に失敗。1秒待機後に自動再試行します。", error);
       await delay(1000);
-      globalStateManager.updateState({ didAutomaticallyRetryFailedApiRequest: true });
+      state.didAutomaticallyRetryFailedApiRequest = true;
     } else {
-      // 自動再試行も失敗した場合、ユーザーに再試行を尋ねる
-      console.error("[attemptApiRequest] APIリクエストが失敗しました。ユーザーに再試行可否を確認します。", error);
+      console.error("6:[attemptApiRequest] APIリクエスト失敗。ユーザーに再試行を確認します。", error);
       const { response } = await ask(
         "api_req_failed",
         error.message ?? JSON.stringify(serializeError(error), null, 2)
       );
       if (response !== "yesButtonClicked") {
-        // noButtonClickedの場合、現在のタスクをクリアしてインスタンスを中止
         throw new Error("API request failed");
       }
-      // ユーザーが再試行を選択した場合
       await say("api_req_retried");
     }
-    // 再帰的に自身を呼び出し、ジェネレーターの出力を委譲
-    console.log("[attemptApiRequest] 再試行を開始します。");
+    console.log("7:[attemptApiRequest] 再帰的に再試行を開始します。");
     yield* attemptApiRequest(previousApiReqIndex);
     return;
   }
 
-  // 最初のチャンク成功後、残りのチャンクをストリーミング
+  // 最初のチャンク受信後、残りのチャンクを順次出力
   for await (const chunk of iterator) {
+    console.log("7:[attemptApiRequest] 次のチャンク", chunk);
     yield chunk;
   }
-
-  console.log("[attemptApiRequest] 完了：ストリームをすべて処理しました。"); // ログ：関数実行終了
+  console.log("8:[attemptApiRequest] すべてのチャンクを処理しました。");
 }
 
 /**
- * 会話履歴をトリムするための次の削除範囲([start, end] 形式)を計算する関数。
- * 
- * - 基本的に最初のメッセージ (index=0) は保持します。
- * - ユーザー-アシスタントのペアを適切に削減することで、会話構造を維持しつつトークンを節約します。
+ * 会話履歴トリミング用の次の削除範囲を計算する関数。
+ * 常に最初のメッセージ (index=0) は保持し、ユーザー・アシスタントペアを保ったまま削減します。
  *
- * @param {Anthropic.Messages.MessageParam[]} messages - 全ての会話メッセージ
- * @param {[number, number] | undefined} currentDeletedRange - これまでに削除した範囲（省略可）
- * @param {"half" | "quarter"} keep - 次のトリム時に半分を残すのか、4分の1だけ残すのかを指定
- * @returns {[number, number]} - 会話から削除する範囲（両端を含むインデックス）のタプル
+ * @param messages 全会話メッセージ
+ * @param currentDeletedRange これまでに削除した範囲（任意）
+ * @param keep "half" なら半分、"quarter" なら4分の1だけ残す
+ * @returns [start, end] の削除範囲
  */
 export function getNextTruncationRange(
-    messages: Anthropic.Messages.MessageParam[],
-    currentDeletedRange: [number, number] | undefined = undefined,
-    keep: "half" | "quarter" = "half",
-  ): [number, number] {
-    console.log("[getNextTruncationRange] 開始：削除範囲を計算します。");
-    // 常に最初のメッセージを残すため、rangeStartIndexは1とする
-    // （将来的にはより賢い削除アルゴリズムに差し替える可能性あり）
-    const rangeStartIndex = 1;
-  
-    // 今までに削除した範囲があれば、そのすぐ後ろから削除する
-    const startOfRest = currentDeletedRange ? currentDeletedRange[1] + 1 : 1;
-    console.log(`[getNextTruncationRange] 現在の削除済み範囲: ${currentDeletedRange}, 次に削除を開始するインデックス: ${startOfRest}`);
-  
-    // 削除するメッセージ数の計算
-    let messagesToRemove: number;
-    if (keep === "half") {
-      // 会話メッセージの残りの半分をさらに削除
-      // ((全メッセージ数 - 削除開始位置) / 4)の整数値に2をかける => ユーザー-アシスタントのペア数を考慮
-      messagesToRemove = Math.floor((messages.length - startOfRest) / 4) * 2;
-      console.log(`[getNextTruncationRange] keep=halfの場合、削除対象ペア数の計算結果: ${messagesToRemove}`);
-    } else {
-      // 4分の3を削除し、4分の1だけ残す
-      // ((全メッセージ数 - 削除開始位置) / 8)の整数値に3*2をかける => 3ペア分削除（4つのうち3つ削除）
-      messagesToRemove = Math.floor((messages.length - startOfRest) / 8) * 3 * 2;
-      console.log(`[getNextTruncationRange] keep=quarterの場合、削除対象ペア数の計算結果: ${messagesToRemove}`);
-    }
-  
-    // 削除終了インデックス（両端含む）
-    let rangeEndIndex = startOfRest + messagesToRemove - 1;
-    console.log(`[getNextTruncationRange] 削除予定範囲仮: [${rangeStartIndex}, ${rangeEndIndex}]`);
-  
-    // 最後に削除されるメッセージがユーザーのメッセージになるように調整
-    // 次のメッセージ開始がアシスタントメッセージになるようにし、ユーザー-アシスタントのペア構造を保つため
-    if (messages[rangeEndIndex]?.role !== "user") {
-      rangeEndIndex -= 1;
-      console.log(`[getNextTruncationRange] 最後の削除対象がユーザーメッセージでないため、endIndexを1つ下げました => ${rangeEndIndex}`);
-    }
-  
-    console.log(`[getNextTruncationRange] 確定した削除範囲: [${rangeStartIndex}, ${rangeEndIndex}]`);
-    return [rangeStartIndex, rangeEndIndex];
+  messages: Anthropic.Messages.MessageParam[],
+  currentDeletedRange: [number, number] | undefined = undefined,
+  keep: "half" | "quarter" = "half"
+): [number, number] {
+  console.log("1:[getNextTruncationRange] 削除範囲を計算します。");
+  // 最初のメッセージは必ず保持するため、削除は index 1 から開始
+  const rangeStart = 1;
+  const startIndex = currentDeletedRange ? currentDeletedRange[1] + 1 : rangeStart;
+  console.log(`2:[getNextTruncationRange] 削除開始インデックス: ${startIndex}`);
+
+  // 削除すべきメッセージ数を算出
+  let messagesToRemove: number;
+  if (keep === "half") {
+    messagesToRemove = Math.floor((messages.length - startIndex) / 4) * 2;
+    console.log(`3:[getNextTruncationRange] keep=half: 削除対象ペア数 = ${messagesToRemove}`);
+  } else {
+    messagesToRemove = Math.floor((messages.length - startIndex) / 8) * 3 * 2;
+    console.log(`3:[getNextTruncationRange] keep=quarter: 削除対象ペア数 = ${messagesToRemove}`);
   }
-  
+
+  // 終了インデックスの計算
+  let rangeEnd = startIndex + messagesToRemove - 1;
+  console.log(`4:[getNextTruncationRange] 仮の削除範囲: [${rangeStart}, ${rangeEnd}]`);
+
+  // ユーザーとアシスタントのペア構造を保つため、最後がユーザーのメッセージになるよう調整
+  if (messages[rangeEnd]?.role !== "user") {
+    rangeEnd -= 1;
+    console.log(`5:[getNextTruncationRange] 最後がユーザーでないため、rangeEndを ${rangeEnd} に調整`);
+  }
+
+  console.log(`6:[getNextTruncationRange] 確定した削除範囲: [${rangeStart}, ${rangeEnd}]`);
+  return [rangeStart, rangeEnd];
+}

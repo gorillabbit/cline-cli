@@ -84,6 +84,9 @@
     - **test/extension.test.ts**: 拡張機能の統合テストファイル。
     - **test/suite/**: テストスイート関連ファイル。
     - **test/webview/**: Webview関連のテストファイル。
+- **tools/**: 各ツール (`attemptApiRequest.ts`, `executeCommandTool.ts`, `loadContext.ts`, `presentAssistantMessage.ts`, `recursivelyMakeClineRequests.ts`) の実装ファイルが含まれています。
+    - **src/tools/recursivelyMakeClineRequests.ts**: APIリクエストの流れをループで処理する関数 `processClineRequests` を実装しています。**修正: `processClineRequests` 関数の返り値ロジックを修正し、API処理が正常に終了した場合にループを終了するように変更しました。これにより、無限ループの問題を解消しました。**
+    - **src/tools/attemptApiRequest.ts**: APIリクエストの最初のチャンク取得を試みる関数 `attemptApiRequest` を実装しています。
 - **utils/**: ユーティリティ関数 (コスト計算、ファイルシステム操作、パス操作、文字列操作など) を提供するファイルが含まれています。
 
 このドキュメントは、プロジェクトのソースコード構造の理解を助けるための概要です。各ファイルとディレクトリの詳細な機能については、それぞれのソースコードを参照してください。

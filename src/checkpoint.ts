@@ -2,7 +2,7 @@ import { globalStateManager } from "./globalState.js"
 import { saveClineMessages } from "./tasks.js"
 
 export const saveCheckpoint = async () => {
-    const stats = globalStateManager.getState()
+    const stats = globalStateManager.state
     const commitHash = await stats.checkpointTracker?.commit() // silently fails for now
     if (commitHash) {
         // Start from the end and work backwards until we find a tool use or another message with a hash
