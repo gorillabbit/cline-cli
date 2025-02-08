@@ -114,14 +114,11 @@ async function trimHistoryIfNeeded(previousApiReqIndex: number): Promise<void> {
 export async function* attemptApiRequest(
   previousApiReqIndex: number
 ): AsyncGenerator<any, void, unknown> {
-  console.log("1:[attemptApiRequest] APIリクエストを開始します。previousApiReqIndex:", previousApiReqIndex);
-
   const state = globalStateManager.state;
   const apiHandler = buildApiHandler(apiStateManager.getState());
 
   // システムプロンプト構築
   const systemPrompt = await buildSystemPrompt();
-  console.log("2:[attemptApiRequest] システムプロンプトを構築しました。");
 
   // 履歴トリミングの必要があれば実施
   await trimHistoryIfNeeded(previousApiReqIndex);
@@ -131,29 +128,23 @@ export async function* attemptApiRequest(
     state.apiConversationHistory,
     state.conversationHistoryDeletedRange
   );
-  console.log("3:[attemptApiRequest] 会話履歴をトリミングしました。");
 
   // ストリーム生成
   const stream = apiHandler.createMessage(systemPrompt, truncatedHistory);
   const iterator = stream[Symbol.asyncIterator]();
-  console.log("4:[attemptApiRequest] ストリームを生成しました。", iterator);
 
   // 最初のチャンク取得（失敗時は再試行またはユーザー問い合わせ）
   try {
-    console.log("5:[attemptApiRequest] 最初のチャンクを待機中…");
     state.isWaitingForFirstChunk = true;
     const firstChunk = await iterator.next();
     yield firstChunk.value;
-    console.log("6:[attemptApiRequest] 最初のチャンクを受信しました。");
     state.isWaitingForFirstChunk = false;
   } catch (error) {
     const isOpenRouter = apiStateManager.getState() instanceof OpenRouterHandler;
     if (isOpenRouter && !state.didAutomaticallyRetryFailedApiRequest) {
-      console.log("6:[attemptApiRequest] 最初のチャンク取得に失敗。1秒待機後に自動再試行します。", error);
       await delay(1000);
       state.didAutomaticallyRetryFailedApiRequest = true;
     } else {
-      console.error("6:[attemptApiRequest] APIリクエスト失敗。ユーザーに再試行を確認します。", error);
       const { response } = await ask(
         "api_req_failed",
         error.message ?? JSON.stringify(serializeError(error), null, 2)
@@ -163,17 +154,15 @@ export async function* attemptApiRequest(
       }
       await say("api_req_retried");
     }
-    console.log("7:[attemptApiRequest] 再帰的に再試行を開始します。");
     yield* attemptApiRequest(previousApiReqIndex);
     return;
   }
 
   // 最初のチャンク受信後、残りのチャンクを順次出力
   for await (const chunk of iterator) {
-    console.log("7:[attemptApiRequest] 次のチャンク", chunk);
+    console.log("[attemptApiRequest] 次のチャンク", chunk);
     yield chunk;
   }
-  console.log("8:[attemptApiRequest] すべてのチャンクを処理しました。");
 }
 
 /**
@@ -190,32 +179,24 @@ export function getNextTruncationRange(
   currentDeletedRange: [number, number] | undefined = undefined,
   keep: "half" | "quarter" = "half"
 ): [number, number] {
-  console.log("1:[getNextTruncationRange] 削除範囲を計算します。");
   // 最初のメッセージは必ず保持するため、削除は index 1 から開始
   const rangeStart = 1;
   const startIndex = currentDeletedRange ? currentDeletedRange[1] + 1 : rangeStart;
-  console.log(`2:[getNextTruncationRange] 削除開始インデックス: ${startIndex}`);
 
   // 削除すべきメッセージ数を算出
   let messagesToRemove: number;
   if (keep === "half") {
     messagesToRemove = Math.floor((messages.length - startIndex) / 4) * 2;
-    console.log(`3:[getNextTruncationRange] keep=half: 削除対象ペア数 = ${messagesToRemove}`);
   } else {
     messagesToRemove = Math.floor((messages.length - startIndex) / 8) * 3 * 2;
-    console.log(`3:[getNextTruncationRange] keep=quarter: 削除対象ペア数 = ${messagesToRemove}`);
   }
 
   // 終了インデックスの計算
   let rangeEnd = startIndex + messagesToRemove - 1;
-  console.log(`4:[getNextTruncationRange] 仮の削除範囲: [${rangeStart}, ${rangeEnd}]`);
 
   // ユーザーとアシスタントのペア構造を保つため、最後がユーザーのメッセージになるよう調整
   if (messages[rangeEnd]?.role !== "user") {
     rangeEnd -= 1;
-    console.log(`5:[getNextTruncationRange] 最後がユーザーでないため、rangeEndを ${rangeEnd} に調整`);
   }
-
-  console.log(`6:[getNextTruncationRange] 確定した削除範囲: [${rangeStart}, ${rangeEnd}]`);
   return [rangeStart, rangeEnd];
 }

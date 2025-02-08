@@ -23,8 +23,6 @@ export const processClineRequests = async (
   initialUserContent: UserContent,
   includeFileDetails: boolean = false,
 ): Promise<boolean> => {
-    console.log("1:[processClineRequests] started");
-    console.log("1.1:[processClineRequests] userContent before loop:", JSON.stringify(globalStateManager.state.userMessageContent));
   let userContent = initialUserContent;
   const state = globalStateManager.state;
 
@@ -52,9 +50,7 @@ export const processClineRequests = async (
     resetStreamingState();
 
     // ── APIリクエストストリームの実行 ──
-    console.log("2:[processClineRequests] processApiStreamを呼ぶ");
     const { assistantMessage, tokenUsage, error: streamError } = await processApiStream();
-    console.log("2.1:[processClineRequests] tokenUsage", tokenUsage);
     if (streamError) {
       await handleStreamAbort("streaming_failed", streamError, assistantMessage);
       return false; // 修正: エラー発生時はループを終了する (falseを返す)
@@ -80,8 +76,6 @@ export const processClineRequests = async (
     // 次のリクエスト用のユーザーコンテンツを取得
     userContent = state.userMessageContent;
   }
-  console.log("3:[processClineRequests] finished");
-
   return true; // 修正: 正常終了時はループを継続する (trueを返す)
 };
 
@@ -236,6 +230,7 @@ async function handleStreamAbort(
     ],
   });
   // 必要に応じた追加処理（例：abortTask の呼び出しや履歴の再初期化）を実施
+  console.log(`[handleStreamAbort] ストリーム中断: ${cancelReason} - ${errorMessage}`);
 }
 
 /**

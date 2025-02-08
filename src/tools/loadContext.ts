@@ -15,7 +15,6 @@ import { UserContent } from "../types.js"
  * @returns 解析されたユーザーコンテンツと環境詳細。
  */
 export const loadContext = async (userContent: UserContent, includeFileDetails: boolean = false) => {
-    console.log("1:[loadContext] started"); // ログ：関数実行開始
     const result = await Promise.all([
         Promise.all(
             userContent.map(async (block) => {
@@ -39,7 +38,6 @@ export const loadContext = async (userContent: UserContent, includeFileDetails: 
         ),
         getEnvironmentDetails(includeFileDetails),
     ])
-    console.log("2:[loadContext] finished"); // ログ：関数実行終了
     return result
 }
 
@@ -49,7 +47,6 @@ export const loadContext = async (userContent: UserContent, includeFileDetails: 
  * @returns 環境詳細を文字列としてフォーマットしたもの.
  */
 export const getEnvironmentDetails = async (includeFileDetails: boolean = false): Promise<string> => {
-    console.log("1:[getEnvironmentDetails] started includeFileDetails:", includeFileDetails); // ログ：関数実行開始
     let details = ""
 
     const state = globalStateManager.state
@@ -79,7 +76,5 @@ export const getEnvironmentDetails = async (includeFileDetails: boolean = false)
     } else {
         details += "\nACT MODE"
     }
-
-    console.log("2:[getEnvironmentDetails] finished"); // Log: Function execution finish
     return `<environment_details>\n${details.trim()}\n</environment_details>`
 }

@@ -66,7 +66,6 @@ export class GenericDiffProvider {
    * @param isFinal 最終更新かどうかのフラグ
    */
   async update(accumulatedContent: string, isFinal: boolean): Promise<void> {
-	console.log("accumulatedContent: ", accumulatedContent)
     if (!this.relPath) {
       throw new Error("ファイルのパスが設定されていません。")
     }
@@ -81,7 +80,6 @@ export class GenericDiffProvider {
     // ※リアルタイムに1行ずつ更新する場合は、差分計算や部分更新が必要ですが、
     //    汎用実装では accumulatedContent 全体でファイルを書き換える処理としています。
     const absolutePath = path.resolve(this.cwd, this.relPath)
-	console.log("absolutePath: ", absolutePath, accumulatedLines.join("\n"))
     await fs.writeFile(absolutePath, accumulatedLines.join("\n"), "utf8")
 
     // VSCode のエディタ上での各行更新や装飾処理は実現が困難なため、以下はコメントアウト
