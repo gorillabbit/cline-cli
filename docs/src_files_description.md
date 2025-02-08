@@ -1,92 +1,64 @@
-# srcディレクトリファイル説明
+## 処理フローの説明
 
-このドキュメントでは、`src`ディレクトリ以下の各ファイルとディレクトリの概要を説明します。
+このCLIツールは、以下のフローでリクエストを処理します。
 
-## ファイルとディレクトリ構成
+1.  `src/index.ts`の`main`関数がエントリーポイントです。 コマンドライン引数からワークスペースフォルダと指示を取得し、`startTask`を呼び出します。
+2.  `src/lifecycle.ts`の`startTask`は、`say`を呼び出し、次に`initiateTaskLoop`を呼び出します。
+3.  `initiateTaskLoop`は、ループ内で`processClineRequests`を呼び出します。
+4.  `src/tools/recursivelyMakeClineRequests.ts`の`processClineRequests`がコアロジックです。 ユーザーコンテンツを処理し、コンテキストをロードし、APIリクエストを行い、レスポンスを処理します。
 
-- **extension.ts**: VS Code拡張機能のエントリーポイントとなるファイルです。拡張機能の起動、コマンド登録、Webviewの管理など、拡張機能全体のライフサイクルを制御します。
-    - `activate(context: vscode.ExtensionContext)`: 拡張機能がアクティブ化されたときに実行される関数です。
-        - `outputChannel`: Cline拡張機能の出力チャネルを作成し、ログを表示するために使用されます。
-        - `sidebarProvider`: `ClineProvider`クラスのインスタンスを作成し、サイドバーのWebviewを管理します。
-        - `vscode.window.registerWebviewViewProvider`: サイドバーWebviewをVS Codeに登録します。
-        - `vscode.commands.registerCommand`: 各種コマンド (`cline.plusButtonClicked`, `cline.mcpButtonClicked`, `cline.popoutButtonClicked`, `cline.openInNewTab`, `cline.settingsButtonClicked`, `cline.historyButtonClicked`, `cline.accountLoginClicked`) を登録し、Webviewからのアクションに応じて処理を実行します。
-        - `diffContentProvider`: `TextDocumentContentProvider`インターフェースを実装するクラスのインスタンスを作成し、Diff Viewの左側のコンテンツを提供します。
-        - `vscode.workspace.registerTextDocumentContentProvider`: Diff ViewのコンテンツプロバイダーをVS Codeに登録します。
-        - `vscode.window.registerUriHandler`: URIハンドラーを登録し、拡張機能のURI (`/openrouter`, `/auth`) を処理します。
-        - `createClineAPI`: 拡張機能APIを作成し、外部から拡張機能の機能を利用できるようにします。
-    - `deactivate()`: 拡張機能が非アクティブ化されたときに実行される関数です。
-- **api/**: 各APIプロバイダーとの通信を抽象化するAPI関連のファイルが含まれています。
-    - **api/index.ts**: APIハンドラーのビルド関数 (`buildApiHandler`) を定義し、APIプロバイダーに基づいて適切なハンドラーを選択します。
-        - `buildApiHandler(configuration: ApiConfiguration)`:  `ApiConfiguration`に基づいて適切な`ApiHandler`インスタンスを生成するファクトリ関数です。指定された`apiProvider`に基づいて、対応するAPIハンドラーのインスタンスを生成し返します。
-    - **api/providers/**: 各APIプロバイダー (Anthropic, Bedrock, OpenRouter, Vertex, OpenAI, Ollama, LM Studio, Gemini, OpenAI Native, DeepSeek, Mistral, VS Code LM) のハンドラー実装が含まれています。各ファイルは、それぞれのAPIプロバイダーとの通信ロジックを実装します。
-    - **api/transform/**: APIからのストリームデータを変換・整形する処理を実装するファイルが含まれています。
-- **core/**: アプリケーションのコアロジックを実装するファイルが含まれています。
-    - **core/Cline.ts**: アプリケーションの主要クラス `Cline` を定義します。Clineクラスは、アプリケーションの状態管理、APIハンドラーの保持、メッセージ処理などを担当します。
-        - `Cline`: アプリケーションの主要クラス。
-            - `constructor(provider: ClineProvider, apiConfiguration: ApiConfiguration, autoApprovalSettings: AutoApprovalSettings, browserSettings: BrowserSettings, chatSettings: ChatSettings, customInstructions?: string, task?: string, images?: string[], historyItem?: HistoryItem)`: コンストラクタ。各種設定、APIハンドラー、ターミナルマネージャー、ブラウザセッションなどを初期化し、新規タスクを開始または履歴からタスクを再開します。
-            - `updateBrowserSettings(browserSettings: BrowserSettings)`: ブラウザ設定を更新します。
-            - `updateChatSettings(chatSettings: ChatSettings)`: チャット設定を更新します。
-            - `ensureTaskDirectoryExists()`: タスクディレクトリが存在することを確認し、存在しない場合は作成します。
-            - `getSavedApiConversationHistory()`: 保存されたAPI会話履歴を取得します。
-            - `addToApiConversationHistory(message: Anthropic.MessageParam)`: API会話履歴にメッセージを追加します。
-            - `overwriteApiConversationHistory(newHistory: Anthropic.MessageParam[])`: API会話履歴を新しい履歴で上書きします。
-            - `saveApiConversationHistory()`: API会話履歴を保存します。
-            - `getSavedClineMessages()`: 保存されたClineメッセージを取得します。
-            - `addToClineMessages(message: ClineMessage)`: Clineメッセージを追加します。
-            - `overwriteClineMessages(newMessages: ClineMessage[])`: Clineメッセージを新しいメッセージで上書きします。
-            - `saveClineMessages()`: Clineメッセージを保存します。
-            - `restoreCheckpoint(messageTs: number, restoreType: ClineCheckpointRestore)`: チェックポイントを復元します。
-            - `presentMultifileDiff(messageTs: number, seeNewChangesSinceLastTaskCompletion: boolean)`: マルチファイルDiffを表示します。
-            - `doesLatestTaskCompletionHaveNewChanges()`: 最新のタスク完了以降に新しい変更があるかどうかを確認します。
-            - `ask(type: ClineAsk, text?: string, partial?: boolean)`: Webviewに質問を送信し、ユーザーからの応答を待ちます。
-            - `handleWebviewAskResponse(askResponse: ClineAskResponse, text?: string, images?: string[])`: Webviewからの質問応答を処理します。
-            - `await say(type: ClineSay, text?: string, images?: string[], partial?: boolean)`: Webviewにメッセージを送信します。
-            - `sayAndCreateMissingParamError(toolName: ToolUseName, paramName: string, relPath?: string)`: 必須パラメータが欠落しているエラーメッセージをWebviewに送信します。
-            - `removeLastPartialMessageIfExistsWithType(type: "ask" | "say", askOrSay: ClineAsk | ClineSay)`: 指定されたタイプとask/sayの種類に一致する最後の部分メッセージを削除します。
-            - `startTask(task?: string, images?: string[])`: 新規タスクを開始します。
-            - `resumeTaskFromHistory()`: 履歴からタスクを再開します。
-            - `initiateTaskLoop(userContent: UserContent, isNewTask: boolean)`: タスク実行ループを開始します。
-            - `abortTask()`: タスクを中止します。
-            - `saveCheckpoint()`: チェックポイントを保存します。
-            - `executeCommandTool(command: string)`: コマンド実行ツールを実行します。
-            - `shouldAutoApproveTool(toolName: ToolUseName)`: ツールが自動承認されるべきかどうかを判断します。
-            - `attemptApiRequest(previousApiReqIndex: number)`: APIリクエストを試行します。
-            - `presentAssistantMessage()`: アシスタントメッセージをWebviewに表示します。
-            - `recursivelyMakeClineRequests(userContent: UserContent, includeFileDetails: boolean, isNewTask: boolean)`: Clineリクエストを再帰的に実行します。
-            - `loadContext(userContent: UserContent, includeFileDetails: boolean)`: コンテキストをロードします。
-            - `getEnvironmentDetails(includeFileDetails: boolean)`: 環境詳細を取得します。
-    - **core/assistant-message/**: アシスタントからのメッセージ解析と処理に関連するファイルが含まれています。
-    - **core/mentions/**: コードメンション機能に関連するファイルが含まれている可能性があります。
-    - **core/prompts/**: プロンプト管理に関連するファイルが含まれています。システムプロンプトやレスポンスプロンプトなどを定義する可能性があります。
-    - **core/sliding-window/**: スライディングウィンドウコンテキスト管理に関連するファイルが含まれている可能性があります。
-    - **core/webview/**: Webview (VS Code拡張機能内で表示されるWebページ) 関連のファイルが含まれています。
-- **exports/**: アプリケーションの公開API (`cline.d.ts`, `index.ts`) やドキュメント (`README.md`) を含むファイルが含まれています。
-- **integrations/**: VS Codeやその他のツールとの統合に関連する機能を提供するファイルが含まれています。
-    - **integrations/checkpoints/**: チェックポイント機能 (状態のスナップショットを保存・復元する機能) に関連するファイルが含まれている可能性があります。
-    - **integrations/debug/**: デバッグ機能に関連するファイルが含まれている可能性があります。
-    - **integrations/diagnostics/**: 診断機能 (エラー検出、警告表示など) に関連するファイルが含まれている可能性があります。
-    - **integrations/editor/**: VS Codeエディタとの統合に関連する機能 (装飾、Diff Viewなど) を提供するファイルが含まれています。
-    - **integrations/misc/**: その他の統合機能 (Markdownエクスポート、テキスト抽出、ファイルオープン、画像処理など) を提供するファイルが含まれています。
-    - **integrations/notifications/**: 通知機能 (VS Codeの通知表示) に関連するファイルが含まれている可能性があります。
-    - **integrations/terminal/**: VS Codeターミナルとの統合に関連する機能 (ターミナル管理、プロセス制御など) を提供するファイルが含まれています。
-    - **integrations/theme/**: テーマ機能 (VS Codeのテーマ適用) に関連するファイルが含まれています。
-    - **integrations/workspace/**: VS Codeワークスペースとの統合に関連する機能 (Python環境検出、ワークスペース追跡など) を提供するファイルが含まれています。
-- **services/**: アプリケーションで使用する各種サービス (認証、ブラウザ、グロブ、ロギング、MCP、ripgrep、Tree-sitter) の実装が含まれています。
-    - **services/auth/**: 認証サービス (Firebase認証など) に関連するファイルが含まれている可能性があります。
-    - **services/browser/**: ブラウザ関連サービス (ブラウザセッション管理、URLコンテンツ取得など) を提供するファイルが含まれています。
-    - **services/glob/**: グロブパターンによるファイルリスト機能を提供するファイル (`list-files.ts`) が含まれています。
-    - **services/logging/**: ロギングサービスを提供するファイル (`Logger.ts`) が含まれています。
-    - **services/mcp/**: MCP (Model Context Protocol) 関連サービスを提供するファイル (`McpHub.ts`) が含まれています。
-    - **services/ripgrep/**: ripgrep (高速なテキスト検索ツール) サービスを提供するファイル (`index.ts`) が含まれています。
-    - **services/tree-sitter/**: Tree-sitter (構文解析ツール) サービスを提供するファイルが含まれています。
-- **shared/**: 複数のモジュールで共有される型定義やユーティリティ関数などの共有ファイルが含まれています。
-- **test/**: テスト関連ファイルが含まれています。
-    - **test/extension.test.ts**: 拡張機能の統合テストファイル。
-    - **test/suite/**: テストスイート関連ファイル。
-    - **test/webview/**: Webview関連のテストファイル。
-- **tools/**: 各ツール (`attemptApiRequest.ts`, `executeCommandTool.ts`, `loadContext.ts`, `presentAssistantMessage.ts`, `recursivelyMakeClineRequests.ts`) の実装ファイルが含まれています。
-    - **src/tools/recursivelyMakeClineRequests.ts**: APIリクエストの流れをループで処理する関数 `processClineRequests` を実装しています。**修正: `processClineRequests` 関数の返り値ロジックを修正し、API処理が正常に終了した場合にループを終了するように変更しました。これにより、無限ループの問題を解消しました。**
-    - **src/tools/attemptApiRequest.ts**: APIリクエストの最初のチャンク取得を試みる関数 `attemptApiRequest` を実装しています。
-- **utils/**: ユーティリティ関数 (コスト計算、ファイルシステム操作、パス操作、文字列操作など) を提供するファイルが含まれています。
+`processClineRequests`関数の詳細な内訳は次のとおりです。
 
-このドキュメントは、プロジェクトのソースコード構造の理解を助けるための概要です。各ファイルとディレクトリの詳細な機能については、それぞれのソースコードを参照してください。
+1.  **初期化：**
+    *   この関数は、`initialUserContent`（`ContentBlock`オブジェクトの配列）とブール値`includeFileDetails`を入力として受け取ります。
+    *   `globalStateManager`を初期化し、現在の状態を取得します。
+2.  **ユーザーコンテンツのループ処理：**
+    *   関数は、`userContent`配列にコンテンツがある限り継続する`while`ループに入ります。
+3.  **前処理：**
+    *   **中断チェック：** タスクが中断されたかどうかを確認します。 中断された場合は、エラーをスローします。
+    *   **制限チェック：** `checkLimits`を呼び出して、連続する間違いがないか確認し、必要に応じてユーザーにガイダンスを求めます。
+    *   **APIリクエストの準備：**
+        *   `formatRequest`を使用して、`userContent`をリクエストテキストにフォーマットします。
+        *   `say("api_req_started", ...)`を使用してAPIリクエストの開始をログに記録し、Clineメッセージを更新します。
+        *   `CheckpointTracker`を初期化します。
+    *   **コンテキストのロード：**
+        *   `loadContext`を呼び出して、環境コンテキスト（ファイルの詳細など）をロードし、`userContent`に追加します。
+        *   `userContent`をAPI会話履歴に追加します。
+        *   最後のリクエストメッセージを更新します。
+        *   Clineメッセージを保存します。
+    *   **ストリーミング状態のリセット：**
+        *   さまざまなストリーミング関連の状態変数をリセットします。
+4.  **APIリクエストのストリーミング：**
+    *   `processApiStream`を呼び出して、APIリクエストを実行し、レスポンスストリームを処理します。
+    *   `processApiStream`は、`attemptApiRequest`を呼び出してAPIリクエストを開始します。
+    *   レスポンスストリームは、チャンクごとに処理されます。
+    *   各チャンクについて：
+        *   チャンクが「usage」チャンクの場合、トークンの使用状況情報を更新します。
+        *   チャンクが「text」チャンクの場合、テキストを`assistantMessage`に追加し、`parseAssistantMessage`を使用してメッセージを解析し、`presentAssistantMessage`を呼び出してメッセージをユーザーに表示します。
+        *   ループは、中断条件（タスクの中断、ツールの拒否、ツールの既に使用）を確認します。
+    *   `processApiStream`は、`assistantMessage`、トークンの使用状況、およびエラーを返します。
+5.  **後処理：**
+    *   ストリームエラーが発生した場合、`handleStreamAbort`を呼び出してエラーを処理し、ループを終了します。
+    *   アシスタントのレスポンスが空の場合、`handleEmptyAssistantResponse`を呼び出してループを終了します。
+    *   アシスタントメッセージをAPI会話履歴に追加します。
+    *   最後のAPIリクエストメッセージをトークンの使用状況情報で更新します。
+    *   Clineメッセージを保存します。
+    *   アシスタントのレスポンスにツールの使用が含まれていない場合、`updateUserContentNoTool`を呼び出してユーザーに通知し、ミスカウントをインクリメントします。
+    *   `finalizePartialBlocks`を呼び出して、アシスタントメッセージ内の部分的なブロックをすべて完了します。
+    *   次のイテレーションのために`userContent`を更新します。
+
+このプロセスには、いくつかのツールが含まれています。
+
+*   `loadContext`: 環境コンテキストをロードします。具体的には、`getEnvironmentDetails`関数を呼び出して環境の詳細を取得し、`listFiles`関数を使用してファイルシステムを探索し、ファイルとディレクトリのリストを生成します。この情報は、AIモデルがファイルの内容や構造を理解するのに役立ちます。
+*   `attemptApiRequest`: APIリクエストを行います。ファイルの内容や変更指示をAPIに送信し、AIモデルからのレスポンスを受け取ります。`processApiStream`関数内で使用されます。
+*   `presentAssistantMessage`: アシスタントメッセージをユーザーに表示します。これには、ファイルへの変更指示や、`executeCommandTool`を使用して実行するコマンドが含まれる場合があります。
+*   `executeCommandTool`: コマンドを実行します。ファイル操作コマンド（例：`git add`、`git commit`、`patch`など）を実行し、その結果をユーザーにストリーミングします。ユーザーは、コマンドの実行中にフィードバックを提供できます。
+
+関連する主要なファイルは次のとおりです。
+
+*   `src/index.ts`: CLIツールのエントリポイント。
+*   `src/lifecycle.ts`: `startTask`および`initiateTaskLoop`関数が含まれています。
+*   `src/tools/recursivelyMakeClineRequests.ts`: リクエストを処理するためのコアロジックである`processClineRequests`関数が含まれています。
+*   `src/tools/loadContext.ts`: 環境コンテキストをロードするためのロジックが含まれています。
+*   `src/services/glob/list-files.ts`: ファイルシステムを探索するためのロジックが含まれています。
+*   `src/tools/executeCommandTool.ts`: コマンドを実行するためのロジックが含まれています。

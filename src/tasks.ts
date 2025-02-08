@@ -108,7 +108,6 @@ export const getSavedClineMessages = async (): Promise<ClineMessage[]> => {
   const taskDir = globalStateManager.state.taskDir;
   const filePath = path.join(taskDir, GlobalFileNames.uiMessages);
   const file = await fs.readFile(filePath, "utf8");
-  console.log("[clineメッセージを取得する] ファイルが存在する", filePath, JSON.parse(file));
   return JSON.parse(file);
 };
 
@@ -124,7 +123,6 @@ export const addToClineMessages = async (
   message.conversationHistoryIndex = state.apiConversationHistory.length - 1;
   message.conversationHistoryDeletedRange = state.conversationHistoryDeletedRange;
 
-  console.log("1:[addToClineMessages] メッセージ:", message)
   if (message.type === "say" && !message.text) {
     return;
   }
@@ -135,7 +133,6 @@ export const addToClineMessages = async (
   // グローバルステートにも反映
   state.clineMessages = clineMessages;
   await saveClineMessages();
-  console.log("2:[addToClineMessages] saveClineMessages を完了しました");
 };
 
 /**
@@ -161,7 +158,6 @@ export const saveClineMessages = async () => {
 
     // ClineメッセージをファイルにJSONとして書き込み
     await fs.writeFile(filePath, JSON.stringify(clineMessages));
-    console.log("1:[message保存] Clineメッセージを保存しました:", filePath);
 
     // ChatView上で結合されるのと同様にAPIメトリクスを取得
     const apiMetrics = getApiMetrics(
@@ -184,9 +180,7 @@ export const saveClineMessages = async () => {
       // getFolderSize.looseはエラーを無視して実行
       // バイト数が返るので、size / 1000 / 1000 でMB換算可能
       taskDirSize = await getFolderSize.loose(taskDir);
-    } catch (error) {
-      console.error("1.5:[saveClineMessages] タスクディレクトリのサイズ取得に失敗しました:", taskDir, error);
-    }
+    } catch (error) {}
 
     // ヒストリーを更新
     updateTaskHistory({
@@ -201,10 +195,8 @@ export const saveClineMessages = async () => {
       size: taskDirSize,
       conversationHistoryDeletedRange: state.conversationHistoryDeletedRange,
     });
-    console.log("2:[saveClineMessages] Clineメッセージの保存とタスクヒストリーの更新が完了しました");
   } catch (error) {
-    console.error("2:[saveClineMessages] Clineメッセージの保存に失敗しました:", error);
-  }
+    console.error("Clineメッセージの保存に失敗しました:", error);}
 };
 
 /**

@@ -1,131 +1,137 @@
 /**
- * Attempts a line-trimmed fallback match for the given search content in the original content.
- * It tries to match `searchContent` lines against a block of lines in `originalContent` starting
- * from `lastProcessedIndex`. Lines are matched by trimming leading/trailing whitespace and ensuring
- * they are identical afterwards.
+ * 与えられた検索コンテンツに対して、オリジナルコンテンツ内で行ごとにトリムしたフォールバックマッチを試みます。
+ * `searchContent` の各行と、`originalContent` の `lastProcessedIndex` 以降の行ブロックを比較し、
+ * 前後の空白を削除した上で一致するかを確認します。
  *
- * Returns [matchIndexStart, matchIndexEnd] if found, or false if not found.
+ * マッチした場合は [matchIndexStart, matchIndexEnd] を返し、マッチしなければ false を返します。
+ *
+ * @param originalContent オリジナルのファイル内容
+ * @param searchContent 検索するコンテンツ（置換前の内容）
+ * @param startIndex オリジナルコンテンツ内で検索を開始する文字位置
+ * @returns [開始文字位置, 終了文字位置] のタプル、または false
  */
-function lineTrimmedFallbackMatch(originalContent: string, searchContent: string, startIndex: number): [number, number] | false {
-	// Split both contents into lines
+function lineTrimmedFallbackMatch(
+	originalContent: string,
+	searchContent: string,
+	startIndex: number
+): [number, number] | false {
+	// オリジナルと検索コンテンツを行ごとに分割
 	const originalLines = originalContent.split("\n")
 	const searchLines = searchContent.split("\n")
+	console.log("[lineTrimmedFallbackMatch] originalLines:", originalLines)
+	console.log("[lineTrimmedFallbackMatch] searchLines:", searchLines)
 
-	// Trim trailing empty line if exists (from the trailing \n in searchContent)
+	// 検索コンテンツの末尾に空行がある場合、削除する（末尾の \n による空行）
 	if (searchLines[searchLines.length - 1] === "") {
 		searchLines.pop()
+		console.log("[lineTrimmedFallbackMatch] 空行を削除後の searchLines:", searchLines)
 	}
 
-	// Find the line number where startIndex falls
+	// startIndex がどの行に該当するかを計算する
 	let startLineNum = 0
 	let currentIndex = 0
 	while (currentIndex < startIndex && startLineNum < originalLines.length) {
-		currentIndex += originalLines[startLineNum].length + 1 // +1 for \n
+		currentIndex += originalLines[startLineNum].length + 1 // 改行分 +1
 		startLineNum++
 	}
+	console.log("[lineTrimmedFallbackMatch] 検索開始行番号:", startLineNum)
 
-	// For each possible starting position in original content
+	// オリジナルコンテンツ内の各開始位置から検索行ブロックが一致するか試す
 	for (let i = startLineNum; i <= originalLines.length - searchLines.length; i++) {
 		let matches = true
 
-		// Try to match all search lines from this position
+		// この位置からすべての検索行が一致するか確認する
 		for (let j = 0; j < searchLines.length; j++) {
 			const originalTrimmed = originalLines[i + j].trim()
 			const searchTrimmed = searchLines[j].trim()
-
 			if (originalTrimmed !== searchTrimmed) {
 				matches = false
 				break
 			}
 		}
 
-		// If we found a match, calculate the exact character positions
+		// マッチが見つかった場合、正確な文字位置を計算する
 		if (matches) {
-			// Find start character index
 			let matchStartIndex = 0
 			for (let k = 0; k < i; k++) {
-				matchStartIndex += originalLines[k].length + 1 // +1 for \n
+				matchStartIndex += originalLines[k].length + 1 // 改行分 +1
 			}
 
-			// Find end character index
 			let matchEndIndex = matchStartIndex
 			for (let k = 0; k < searchLines.length; k++) {
-				matchEndIndex += originalLines[i + k].length + 1 // +1 for \n
+				matchEndIndex += originalLines[i + k].length + 1 // 改行分 +1
 			}
-
+			console.log("[lineTrimmedFallbackMatch] マッチ発見: 開始位置=", matchStartIndex, " 終了位置=", matchEndIndex)
 			return [matchStartIndex, matchEndIndex]
 		}
 	}
 
+	console.log("[lineTrimmedFallbackMatch] マッチなし")
 	return false
 }
 
 /**
- * Attempts to match blocks of code by using the first and last lines as anchors.
- * This is a third-tier fallback strategy that helps match blocks where we can identify
- * the correct location by matching the beginning and end, even if the exact content
- * differs slightly.
+ * ブロックアンカーフォールバックマッチ
  *
- * The matching strategy:
- * 1. Only attempts to match blocks of 3 or more lines to avoid false positives
- * 2. Extracts from the search content:
- *    - First line as the "start anchor"
- *    - Last line as the "end anchor"
- * 3. For each position in the original content:
- *    - Checks if the next line matches the start anchor
- *    - If it does, jumps ahead by the search block size
- *    - Checks if that line matches the end anchor
- *    - All comparisons are done after trimming whitespace
+ * コードブロックの最初と最後の行をアンカーとして利用し、ブロック全体のマッチを試みる方法です。
+ * ・3 行以上のブロックに対してのみ試行（誤検知を避けるため）
+ * ・検索コンテンツから先頭行と末尾行をそれぞれ抽出し、オリジナルコンテンツ内で
+ *   同じ位置にそれらがあるかをチェックします。
  *
- * This approach is particularly useful for matching blocks of code where:
- * - The exact content might have minor differences
- * - The beginning and end of the block are distinctive enough to serve as anchors
- * - The overall structure (number of lines) remains the same
- *
- * @param originalContent - The full content of the original file
- * @param searchContent - The content we're trying to find in the original file
- * @param startIndex - The character index in originalContent where to start searching
- * @returns A tuple of [startIndex, endIndex] if a match is found, false otherwise
+ * @param originalContent オリジナルのファイル内容
+ * @param searchContent 検索するコンテンツ（置換前の内容）
+ * @param startIndex オリジナルコンテンツ内で検索を開始する文字位置
+ * @returns [開始位置, 終了位置] のタプル、または false
  */
-function blockAnchorFallbackMatch(originalContent: string, searchContent: string, startIndex: number): [number, number] | false {
+function blockAnchorFallbackMatch(
+	originalContent: string,
+	searchContent: string,
+	startIndex: number
+): [number, number] | false {
 	const originalLines = originalContent.split("\n")
 	const searchLines = searchContent.split("\n")
 
-	// Only use this approach for blocks of 3+ lines
+	console.log("[blockAnchorFallbackMatch] originalLines:", originalLines)
+	console.log("[blockAnchorFallbackMatch] searchLines:", searchLines)
+
+	// 3 行未満のブロックの場合は、この方法は使用しない
 	if (searchLines.length < 3) {
+		console.log("[blockAnchorFallbackMatch] searchLines.length < 3")
 		return false
 	}
 
-	// Trim trailing empty line if exists
+	// 末尾の空行があれば削除する
 	if (searchLines[searchLines.length - 1] === "") {
 		searchLines.pop()
+		console.log("[blockAnchorFallbackMatch] 空行を削除後の searchLines:", searchLines)
 	}
 
 	const firstLineSearch = searchLines[0].trim()
 	const lastLineSearch = searchLines[searchLines.length - 1].trim()
 	const searchBlockSize = searchLines.length
 
-	// Find the line number where startIndex falls
+	// startIndex がどの行に該当するかを計算する
 	let startLineNum = 0
 	let currentIndex = 0
 	while (currentIndex < startIndex && startLineNum < originalLines.length) {
 		currentIndex += originalLines[startLineNum].length + 1
 		startLineNum++
 	}
+	console.log("[blockAnchorFallbackMatch] 検索開始行番号:", startLineNum)
 
-	// Look for matching start and end anchors
+	// 最初と最後のアンカー行が一致する箇所を探す
 	for (let i = startLineNum; i <= originalLines.length - searchBlockSize; i++) {
-		// Check if first line matches
+		// 先頭行が一致するかチェック
 		if (originalLines[i].trim() !== firstLineSearch) {
 			continue
 		}
 
-		// Check if last line matches at the expected position
+		// 終了行が期待通り一致するかチェック
 		if (originalLines[i + searchBlockSize - 1].trim() !== lastLineSearch) {
 			continue
 		}
 
-		// Calculate exact character positions
+		// 一致が確認できたら、正確な文字位置を計算する
 		let matchStartIndex = 0
 		for (let k = 0; k < i; k++) {
 			matchStartIndex += originalLines[k].length + 1
@@ -136,71 +142,70 @@ function blockAnchorFallbackMatch(originalContent: string, searchContent: string
 			matchEndIndex += originalLines[i + k].length + 1
 		}
 
+		console.log("[blockAnchorFallbackMatch] マッチ発見: 開始位置=", matchStartIndex, " 終了位置=", matchEndIndex)
 		return [matchStartIndex, matchEndIndex]
 	}
 
+	console.log("[blockAnchorFallbackMatch] マッチなし")
 	return false
 }
 
 /**
- * This function reconstructs the file content by applying a streamed diff (in a
- * specialized SEARCH/REPLACE block format) to the original file content. It is designed
- * to handle both incremental updates and the final resulting file after all chunks have
- * been processed.
+ * ストリームされた diff（SEARCH/REPLACE ブロック形式）を元に、
+ * オリジナルのファイル内容に変更を適用し、新しいファイル内容を構築します。
  *
- * The diff format is a custom structure that uses three markers to define changes:
- *
+ * この diff 形式は以下の 3 つのマーカーを使用します:
+ * 
  *   <<<<<<< SEARCH
- *   [Exact content to find in the original file]
+ *   [オリジナルから検索する内容]
  *   =======
- *   [Content to replace with]
+ *   [置換後の内容]
  *   >>>>>>> REPLACE
  *
- * Behavior and Assumptions:
- * 1. The file is processed chunk-by-chunk. Each chunk of `diffContent` may contain
- *    partial or complete SEARCH/REPLACE blocks. By calling this function with each
- *    incremental chunk (with `isFinal` indicating the last chunk), the final reconstructed
- *    file content is produced.
+ * 挙動および前提:
+ * 1. ファイルはチャンクごとに処理されます。各チャンクは部分的または完全な SEARCH/REPLACE ブロックを含む場合があります。
+ *    この関数は、各更新チャンク（最終チャンクの場合は isFinal=true）ごとに呼び出され、
+ *    最終的なファイル内容を構築します。
  *
- * 2. Matching Strategy (in order of attempt):
- *    a. Exact Match: First attempts to find the exact SEARCH block text in the original file
- *    b. Line-Trimmed Match: Falls back to line-by-line comparison ignoring leading/trailing whitespace
- *    c. Block Anchor Match: For blocks of 3+ lines, tries to match using first/last lines as anchors
- *    If all matching strategies fail, an error is thrown.
+ * 2. マッチング戦略（試行順）:
+ *    a. 完全一致: まず、オリジナルファイル内で SEARCH ブロックの内容と完全一致する位置を探す。
+ *    b. 行トリム一致: 前後の空白を無視して行ごとに比較するフォールバック戦略。
+ *    c. ブロックアンカー一致: 3 行以上の場合、先頭と末尾の行をアンカーとして利用する戦略。
+ *    いずれの戦略でもマッチしなければエラーをスローします。
  *
- * 3. Empty SEARCH Section:
- *    - If SEARCH is empty and the original file is empty, this indicates creating a new file
- *      (pure insertion).
- *    - If SEARCH is empty and the original file is not empty, this indicates a complete
- *      file replacement (the entire original content is considered matched and replaced).
+ * 3. 空の SEARCH セクション:
+ *    - SEARCH が空で、オリジナルファイルも空の場合は、新規ファイル作成（挿入のみ）と判断します。
+ *    - SEARCH が空で、オリジナルファイルが空でない場合は、ファイル全体の置換とみなします。
  *
- * 4. Applying Changes:
- *    - Before encountering the "=======" marker, lines are accumulated as search content.
- *    - After "=======" and before ">>>>>>> REPLACE", lines are accumulated as replacement content.
- *    - Once the block is complete (">>>>>>> REPLACE"), the matched section in the original
- *      file is replaced with the accumulated replacement lines, and the position in the original
- *      file is advanced.
+ * 4. 変更の適用:
+ *    - "=======" マーカーまでの内容は検索内容として蓄積される。
+ *    - "=======" マーカー以降、 ">>>>>>> REPLACE" までの内容は置換内容として蓄積される。
+ *    - ブロックが完了すると、オリジナルファイル内の該当箇所を置換内容で更新し、
+ *      オリジナルの処理位置を進めます。
  *
- * 5. Incremental Output:
- *    - As soon as the match location is found and we are in the REPLACE section, each new
- *      replacement line is appended to the result so that partial updates can be viewed
- *      incrementally.
+ * 5. インクリメンタル出力:
+ *    - マッチ位置が見つかり REPLACE セクションに入ったら、その置換行を結果に逐次追加します。
  *
- * 6. Partial Markers:
- *    - If the final line of the chunk looks like it might be part of a marker but is not one
- *      of the known markers, it is removed. This prevents incomplete or partial markers
- *      from corrupting the output.
+ * 6. 部分的なマーカー:
+ *    - チャンクの最終行が部分的なマーカーである場合、それが既知のマーカーでなければ削除します。
  *
- * 7. Finalization:
- *    - Once all chunks have been processed (when `isFinal` is true), any remaining original
- *      content after the last replaced section is appended to the result.
- *    - Trailing newlines are not forcibly added. The code tries to output exactly what is specified.
+ * 7. 最終化:
+ *    - 全チャンク処理完了後（isFinal が true）、最後の置換箇所以降のオリジナル内容を結果に追加します。
+ *    - 余分な末尾改行は追加しません。
  *
- * Errors:
- * - If the search block cannot be matched using any of the available matching strategies,
- *   an error is thrown.
+ * エラー:
+ * - 利用可能なマッチ戦略ですべてのマッチに失敗した場合、エラーをスローします。
+ *
+ * @param diffContent 適用する diff の内容
+ * @param originalContent オリジナルのファイル内容
+ * @param isFinal 最終チャンクかどうかのフラグ
+ * @returns 構築された新しいファイル内容
  */
-export async function constructNewFileContent(diffContent: string, originalContent: string, isFinal: boolean): Promise<string> {
+export async function constructNewFileContent(
+	diffContent: string,
+	originalContent: string,
+	isFinal: boolean
+): Promise<string> {
 	let result = ""
 	let lastProcessedIndex = 0
 
@@ -213,9 +218,9 @@ export async function constructNewFileContent(diffContent: string, originalConte
 	let searchEndIndex = -1
 
 	let lines = diffContent.split("\n")
+	console.log("[constructNewFileContent] diffContent 行数:", lines.length)
 
-	// If the last line looks like a partial marker but isn't recognized,
-	// remove it because it might be incomplete.
+	// チャンクの最終行が不完全なマーカーの場合、削除する
 	const lastLine = lines[lines.length - 1]
 	if (
 		lines.length > 0 &&
@@ -224,11 +229,14 @@ export async function constructNewFileContent(diffContent: string, originalConte
 		lastLine !== "=======" &&
 		lastLine !== ">>>>>>> REPLACE"
 	) {
+		console.log("[constructNewFileContent] 不完全なマーカー行を削除:", lastLine)
 		lines.pop()
 	}
 
+	// 行ごとに処理
 	for (const line of lines) {
 		if (line === "<<<<<<< SEARCH") {
+			console.log("[constructNewFileContent] '<<<<< SEARCH' を検出")
 			inSearch = true
 			currentSearchContent = ""
 			currentReplaceContent = ""
@@ -236,80 +244,72 @@ export async function constructNewFileContent(diffContent: string, originalConte
 		}
 
 		if (line === "=======") {
+			console.log("[constructNewFileContent] '=======' を検出。SEARCH セクション終了、REPLACE セクション開始")
 			inSearch = false
 			inReplace = true
 
-			// Remove trailing linebreak for adding the === marker
-			// if (currentSearchContent.endsWith("\r\n")) {
-			// 	currentSearchContent = currentSearchContent.slice(0, -2)
-			// } else if (currentSearchContent.endsWith("\n")) {
-			// 	currentSearchContent = currentSearchContent.slice(0, -1)
-			// }
+			// currentSearchContent の末尾改行の処理（必要に応じて削除する場合は下記コメントを参照）
+			/*
+			if (currentSearchContent.endsWith("\r\n")) {
+				currentSearchContent = currentSearchContent.slice(0, -2)
+			} else if (currentSearchContent.endsWith("\n")) {
+				currentSearchContent = currentSearchContent.slice(0, -1)
+			}
+			*/
 
 			if (!currentSearchContent) {
-				// Empty search block
+				// SEARCH セクションが空の場合
 				if (originalContent.length === 0) {
-					// New file scenario: nothing to match, just start inserting
+					// 新規ファイル作成シナリオ
 					searchMatchIndex = 0
 					searchEndIndex = 0
+					console.log("[constructNewFileContent] 空の SEARCH ブロック（新規ファイル）")
 				} else {
-					// Complete file replacement scenario: treat the entire file as matched
+					// 完全なファイル置換シナリオ
 					searchMatchIndex = 0
 					searchEndIndex = originalContent.length
+					console.log("[constructNewFileContent] 空の SEARCH ブロック（ファイル全体置換）")
 				}
 			} else {
-				// Add check for inefficient full-file search
-				// if (currentSearchContent.trim() === originalContent.trim()) {
-				// 	throw new Error(
-				// 		"The SEARCH block contains the entire file content. Please either:\n" +
-				// 			"1. Use an empty SEARCH block to replace the entire file, or\n" +
-				// 			"2. Make focused changes to specific parts of the file that need modification.",
-				// 	)
-				// }
-
-				// Exact search match scenario
+				// 完全一致による検索
 				const exactIndex = originalContent.indexOf(currentSearchContent, lastProcessedIndex)
 				if (exactIndex !== -1) {
 					searchMatchIndex = exactIndex
 					searchEndIndex = exactIndex + currentSearchContent.length
+					console.log("[constructNewFileContent] 完全一致発見: 開始=", searchMatchIndex, " 終了=", searchEndIndex)
 				} else {
-					// Attempt fallback line-trimmed matching
+					// 行トリム一致の試行
 					const lineMatch = lineTrimmedFallbackMatch(originalContent, currentSearchContent, lastProcessedIndex)
 					if (lineMatch) {
 						;[searchMatchIndex, searchEndIndex] = lineMatch
+						console.log("[constructNewFileContent] 行トリム一致発見: 開始=", searchMatchIndex, " 終了=", searchEndIndex)
 					} else {
-						// Try block anchor fallback for larger blocks
+						// ブロックアンカー一致の試行
 						const blockMatch = blockAnchorFallbackMatch(originalContent, currentSearchContent, lastProcessedIndex)
 						if (blockMatch) {
 							;[searchMatchIndex, searchEndIndex] = blockMatch
+							console.log("[constructNewFileContent] ブロックアンカー一致発見: 開始=", searchMatchIndex, " 終了=", searchEndIndex)
 						} else {
 							throw new Error(
-								`The SEARCH block:\n${currentSearchContent.trimEnd()}\n...does not match anything in the file.`,
+								`SEARCH ブロック:\n${currentSearchContent.trimEnd()}\n...がファイル内のどこにもマッチしませんでした。`
 							)
 						}
 					}
 				}
 			}
 
-			// Output everything up to the match location
+			// マッチ位置までのオリジナル内容を結果に追加
 			result += originalContent.slice(lastProcessedIndex, searchMatchIndex)
+			console.log("[constructNewFileContent] 結果に追加: 文字位置", lastProcessedIndex, "から", searchMatchIndex)
 			continue
 		}
 
 		if (line === ">>>>>>> REPLACE") {
-			// Finished one replace block
-
-			// // Remove the artificially added linebreak in the last line of the REPLACE block
-			// if (result.endsWith("\r\n")) {
-			// 	result = result.slice(0, -2)
-			// } else if (result.endsWith("\n")) {
-			// 	result = result.slice(0, -1)
-			// }
-
-			// Advance lastProcessedIndex to after the matched section
+			console.log("[constructNewFileContent] '>>>>>>> REPLACE' を検出。置換ブロック終了")
+			// ひとつの置換ブロックが終了したので、処理位置を更新する
 			lastProcessedIndex = searchEndIndex
 
-			// Reset for next block
+			// 次のブロックに備えてリセット
 			inSearch = false
 			inReplace = false
 			currentSearchContent = ""
@@ -319,25 +319,25 @@ export async function constructNewFileContent(diffContent: string, originalConte
 			continue
 		}
 
-		// Accumulate content for search or replace
-		// (currentReplaceContent is not being used for anything right now since we directly append to result.)
-		// (We artificially add a linebreak since we split on \n at the beginning. In order to not include a trailing linebreak in the final search/result blocks we need to remove it before using them. This allows for partial line matches to be correctly identified.)
-		// NOTE: search/replace blocks must be arranged in the order they appear in the file due to how we build the content using lastProcessedIndex. We also cannot strip the trailing newline since for non-partial lines it would remove the linebreak from the original content. (If we remove end linebreak from search, then we'd also have to remove it from replace but we can't know if it's a partial line or not since the model may be using the line break to indicate the end of the block rather than as part of the search content.) We require the model to output full lines in order for our fallbacks to work as well.
+		// SEARCH または REPLACE セクションの内容を蓄積する
 		if (inSearch) {
 			currentSearchContent += line + "\n"
 		} else if (inReplace) {
 			currentReplaceContent += line + "\n"
-			// Output replacement lines immediately if we know the insertion point
+			// 置換内容は、マッチ位置がわかっている場合、逐次結果に追加する
 			if (searchMatchIndex !== -1) {
 				result += line + "\n"
+				console.log("[constructNewFileContent] 置換行を追加:", line)
 			}
 		}
 	}
 
-	// If this is the final chunk, append any remaining original content
+	// 最終チャンクの場合、最後のマッチ位置以降のオリジナル内容を結果に追加する
 	if (isFinal && lastProcessedIndex < originalContent.length) {
 		result += originalContent.slice(lastProcessedIndex)
+		console.log("[constructNewFileContent] 最終更新: 結果に残りを追加、位置", lastProcessedIndex, "以降")
 	}
 
+	console.log("[constructNewFileContent] 最終結果の長さ:", result.length)
 	return result
 }

@@ -3,7 +3,6 @@ import path from "path"
 import { cwd } from "process"
 import { serializeError } from "serialize-error"
 import cloneDeep from "clone-deep"
-import delay from "delay"
 import { ToolParamName } from "../assistant-message/index.js"
 import { ask } from "../chat.js"
 import { saveCheckpoint } from "../checkpoint.js"
@@ -19,11 +18,11 @@ import { findLast } from "../shared/array.js"
 import { say, removeLastPartialMessageIfExistsWithType, sayAndCreateMissingParamError, saveClineMessages } from "../tasks.js"
 import { ToolResponse, ClineAsk, ClineSayTool, COMPLETION_RESULT_CHANGES_FLAG } from "../types.js"
 import { getReadablePath } from "../utils/path.js"
-import { fixModelHtmlEscaping, removeInvalidChars } from "../utils/string.js"
 import { doesLatestTaskCompletionHaveNewChanges } from "./doesLatestTaskCompletionHaveNewChanges.js"
 import { executeCommandTool } from "./executeCommandTool.js"
-import { apiStateManager } from "../apiState.js"
-import { buildApiHandler } from "../api/index.js"
+import { GenericDiffProvider } from "../integrations/editor/DiffViewProvider.js"
+import { fileExistsAtPath } from "../utils/fs.js"
+import { constructNewFileContent } from "../assistant-message/diff.js"
 
 /**
  * アシスタントのメッセージをユーザーに提示し、各種コンテンツブロックやツールとの対話を処理します。
@@ -31,10 +30,9 @@ import { buildApiHandler } from "../api/index.js"
  */
 export const presentAssistantMessage = async () => {
     const state = globalStateManager.state
+    const genericDiffProvider = new GenericDiffProvider(state.workspaceFolder ?? "")
 
     console.log("1:[プレゼント] 開始"); // ログ: 関数実行開始
-    const apiState = apiStateManager.getState()
-    const apiHandler = buildApiHandler(apiState)
 
     // タスク中止が指定されている場合はエラーを投げる
     if (state.abort) {
@@ -64,7 +62,7 @@ export const presentAssistantMessage = async () => {
 
     // ストリーミング中に配列が更新される可能性があるため、ディープコピーを作成
     const block = cloneDeep(state.assistantMessageContent[state.currentStreamingContentIndex])
-    console.log(`4:[プレゼント]処理中のブロックタイプ: ${block.type}`)
+    console.log(`4:[プレゼント]処理中のブロック: `,block)
 
     switch (block.type) {
         case "text": {
@@ -250,14 +248,44 @@ export const presentAssistantMessage = async () => {
                         break
                     }
                     let fileExists: boolean = false
+                    if (genericDiffProvider.editType !== undefined) {
+                        fileExists = genericDiffProvider.editType === "modify"
+                    } else {
+                        const absolutePath = path.resolve(state.workspaceFolder ?? "", relPath)
+                        fileExists = await fileExistsAtPath(absolutePath)
+                        genericDiffProvider.editType = fileExists ? "modify" : "create"
+                    }
 
                     try {
                         let newContent: string = ""
                         if (diff) {
-                            
+                            if (!genericDiffProvider.isEditing) {
+                                await genericDiffProvider.open(relPath)
+                            }
+
+                            try {
+                                newContent = await constructNewFileContent(
+                                    diff,
+                                    genericDiffProvider.originalContent || "",
+                                    !block.partial,
+                                )
+                            } catch (error) {
+                                await say("diff_error", relPath)
+                                pushToolResult(
+                                    formatResponse.toolError(
+                                        `${(error as Error)?.message}\n\n` +
+                                            `This is likely because the SEARCH block content doesn't match exactly with what's in the file, or if you used multiple SEARCH/REPLACE blocks they may not have been in the order they appear in the file.\n\n` +
+                                            `The file was reverted to its original state:\n\n` +
+                                            `<file_content path="${relPath.toPosix()}">\n${genericDiffProvider.originalContent}\n</file_content>\n\n` +
+                                            `Try again with a more precise SEARCH block.\n(If you keep running into this error, you may use the write_to_file tool as a workaround.)`,
+                                    ),
+                                )
+                                await genericDiffProvider.revertChanges()
+                                await genericDiffProvider.reset()
+                                break
+                            }
                         } else if (content) {
                             newContent = content
-
                             // マークダウンコードブロックのアーティファクトを除去
                             if (newContent.startsWith("```")) {
                                 newContent = newContent.split("\n").slice(1).join("\n").trim()
@@ -265,7 +293,6 @@ export const presentAssistantMessage = async () => {
                             if (newContent.endsWith("```")) {
                                 newContent = newContent.split("\n").slice(0, -1).join("\n").trim()
                             }
-
                         } else {
                             break
                         }
@@ -287,6 +314,13 @@ export const presentAssistantMessage = async () => {
                                 removeLastPartialMessageIfExistsWithType("say", "tool")
                                 await ask("tool", partialMessage, block.partial).catch(() => {})
                             }
+                            // update editor
+                            if (!genericDiffProvider.isEditing) {
+                                // open the editor and prepare to stream content in
+                                await genericDiffProvider.open(relPath)
+                            }
+                            // editor is open, stream content in
+                            await genericDiffProvider.update(newContent, false)
                             break
                         } else {
                             if (!relPath) {
@@ -308,11 +342,21 @@ export const presentAssistantMessage = async () => {
                                 break
                             }
                             state.consecutiveMistakeCount = 0
+                            if (!genericDiffProvider.isEditing) {
+                                // show gui message before showing edit animation
+                                const partialMessage = JSON.stringify(sharedMessageProps)
+                                await ask("tool", partialMessage, true).catch(() => {}) // sending true for partial even though it's not a partial, this shows the edit row before the content is streamed into the editor
+                                await genericDiffProvider.open(relPath) // updated to use genericDiffProvider
+                            }
+                            await genericDiffProvider.update(newContent, true) // updated to use genericDiffProvider
 
                             const completeMessage = JSON.stringify({
                                 ...sharedMessageProps,
                                 content: diff || content,
                             } satisfies ClineSayTool)
+
+
+                            console.log(`Tool operation '${block.name}' completed successfully.`);
 
                             if (shouldAutoApproveTool(block.name)) {
                                 removeLastPartialMessageIfExistsWithType("ask", "tool")
@@ -332,9 +376,12 @@ export const presentAssistantMessage = async () => {
                 }
                 case "read_file": {
                     const relPath: string | undefined = block.params.path
+                    if (!state.workspaceFolder) {
+                        break
+                    }
                     const sharedMessageProps: ClineSayTool = {
                         tool: "readFile",
-                        path: getReadablePath(cwd(), removeClosingTag("path", relPath)),
+                        path: getReadablePath(state.workspaceFolder, removeClosingTag("path", relPath)),
                     }
                     try {
                         if (block.partial) {
@@ -357,7 +404,7 @@ export const presentAssistantMessage = async () => {
                                 break
                             }
                             state.consecutiveMistakeCount = 0
-                            const absolutePath = path.resolve(cwd(), relPath)
+                            const absolutePath = path.resolve(state.workspaceFolder, relPath)
                             const completeMessage = JSON.stringify({
                                 ...sharedMessageProps,
                                 content: absolutePath,
