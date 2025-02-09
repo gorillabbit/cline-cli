@@ -1,3 +1,4 @@
+import { Database } from "sqlite";
 import { AssistantMessageContent } from "./assistant-message/index.js";
 import CheckpointTracker from "./integrations/checkpoints/CheckpointTracker.js";
 import { ChatSettings } from "./shared/ChatSettings.js";
@@ -41,7 +42,7 @@ export interface GlobalState {
 	didAutomaticallyRetryFailedApiRequest : boolean
   isAwaitingPlanResponse?: boolean;
   didRespondToPlanAskBySwitchingMode?: boolean;
-
+  db?: Database;
   abandoned?: boolean;
 }
   
@@ -73,6 +74,8 @@ class GlobalStateManager {
     didAlreadyUseTool: false,
     didCompleteReadingStream: false,
     didAutomaticallyRetryFailedApiRequest: false,
+    db: undefined,
+    abandoned: false,
   };
 
   private constructor() {}
