@@ -624,12 +624,9 @@ export const presentAssistantMessage = async () => {
                                 console.log("コマンド実行中: 自動承認されたコマンドが30秒以上実行中です。ご確認ください。")
                             }, 30_000)
 
-                            const [userRejected, result] = await executeCommandTool(command)
+                            const [result] = await executeCommandTool(command)
                             if (timeoutId) {
                                 clearTimeout(timeoutId)
-                            }
-                            if (userRejected) {
-                                state.didRejectTool = true
                             }
                             pushToolResult(result)
                             break
@@ -773,13 +770,7 @@ export const presentAssistantMessage = async () => {
                                     await saveCheckpoint()
                                     break
                                 }
-                                const [userRejected, execCommandResult] = await executeCommandTool(command!)
-                                if (userRejected) {
-                                    state.didRejectTool = true
-                                    pushToolResult(execCommandResult)
-                                    await saveCheckpoint()
-                                    break
-                                }
+                                const [execCommandResult] = await executeCommandTool(command!)
                                 commandResult = execCommandResult
                             } else {
                                 await say(Say.COMPLETION_RESULT, result, undefined, false)

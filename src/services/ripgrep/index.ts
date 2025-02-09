@@ -124,7 +124,7 @@ async function execRipgrep(bin: string, args: string[]): Promise<string> {
 
 export async function regexSearchFiles(cwd: string, directoryPath: string, regex: string, filePattern?: string): Promise<string> {
 	const vscodeAppRoot = globalStoragePath
-	const rgPath = await getBinPath(vscodeAppRoot)
+	const rgPath = "/usr/bin/rg"
 
 	if (!rgPath) {
 		throw new Error("Could not find ripgrep binary")
