@@ -5,17 +5,15 @@ import cloneDeep from "clone-deep"
 import { ToolParamName } from "../assistant-message/index.js"
 import { ask } from "../chat.js"
 import { saveCheckpoint } from "../checkpoint.js"
-import { shouldAutoApproveTool } from "../clineUtils.js"
 import { globalStateManager } from "../globalState.js"
 import { extractTextFromFile } from "../integrations/misc/extract-text.js"
-import { showSystemNotification } from "../notifications/index.js"
 import { formatResponse } from "../prompts/responses.js"
 import { listFiles } from "../services/glob/list-files.js"
 import { regexSearchFiles } from "../services/ripgrep/index.js"
 import { parseSourceCodeForDefinitionsTopLevel } from "../services/tree-sitter/index.js"
 import { findLast } from "../shared/array.js"
 import { say, removeLastPartialMessageIfExistsWithType, sayAndCreateMissingParamError } from "../tasks.js"
-import { ToolResponse, ClineAsk, ClineSayTool, COMPLETION_RESULT_CHANGES_FLAG } from "../types.js"
+import { ToolResponse, ClineSayTool, COMPLETION_RESULT_CHANGES_FLAG } from "../types.js"
 import { getReadablePath } from "../utils/path.js"
 import { doesLatestTaskCompletionHaveNewChanges } from "./doesLatestTaskCompletionHaveNewChanges.js"
 import { executeCommandTool } from "./executeCommandTool.js"
@@ -310,13 +308,8 @@ export const presentAssistantMessage = async () => {
 
                         if (block.partial) {
                             const partialMessage = JSON.stringify(sharedMessageProps)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
                                 await say(Say.TOOL, partialMessage, undefined, block.partial)
-                            } else {
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                                await ask(Ask.TOOL, partialMessage, block.partial).catch(() => {})
-                            }
                             // update editor
                             if (!genericDiffProvider.isEditing) {
                                 // open the editor and prepare to stream content in
@@ -360,16 +353,8 @@ export const presentAssistantMessage = async () => {
 
 
                             console.log(`Tool operation '${block.name}' completed successfully.`);
-
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, completeMessage, undefined, false)
-                            } else {
-                                console.log(
-                                    `Clineが ${fileExists ? "既存ファイルの編集" : "新規ファイルの作成"} を要求しています: ${path.basename(relPath)}`,
-                                )
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
+                            await say(Say.TOOL, completeMessage, undefined, false)
                         }
                     } catch (error) {
                         await handleError("ファイル書き込み", error)
@@ -392,13 +377,8 @@ export const presentAssistantMessage = async () => {
                                 ...sharedMessageProps,
                                 content: undefined,
                             } satisfies ClineSayTool)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, partialMessage, undefined, block.partial)
-                            } else {
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                                await ask(Ask.TOOL, partialMessage,  block.partial)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
+                            await say(Say.TOOL, partialMessage, undefined, block.partial)
                             break
                         } else {
                             if (!relPath) {
@@ -412,12 +392,8 @@ export const presentAssistantMessage = async () => {
                                 ...sharedMessageProps,
                                 content: absolutePath,
                             } satisfies ClineSayTool)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, completeMessage, undefined, false)
-                            } else {
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
+                            await say(Say.TOOL, completeMessage, undefined, false)
                             // now execute the tool like normal
                             const content = await extractTextFromFile(absolutePath)
                             pushToolResult(content)
@@ -442,13 +418,8 @@ export const presentAssistantMessage = async () => {
                                 ...sharedMessageProps,
                                 content: "",
                             } satisfies ClineSayTool)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, partialMessage, undefined, block.partial)
-                            } else {
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                                await ask(Ask.TOOL, partialMessage, undefined)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
+                            await say(Say.TOOL, partialMessage, undefined, block.partial)
                             break
                         }else {
                             if (!relDirPath) {
@@ -465,12 +436,8 @@ export const presentAssistantMessage = async () => {
                                 ...sharedMessageProps,
                                 content: result,
                             } satisfies ClineSayTool)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, completeMessage, undefined, false)
-                            } else {
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
+                            await say(Say.TOOL, completeMessage, undefined, false)
                             pushToolResult(result)
                             break
                         }
@@ -491,13 +458,8 @@ export const presentAssistantMessage = async () => {
                                 ...sharedMessageProps,
                                 content: "",
                             } satisfies ClineSayTool)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, partialMessage, undefined, block.partial)
-                            } else {
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                                await ask(Ask.TOOL, partialMessage, block.partial)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
+                            await say(Say.TOOL, partialMessage, undefined, block.partial)
                             break
                          } else {
                             if (!relDirPath) {
@@ -512,11 +474,8 @@ export const presentAssistantMessage = async () => {
                                 ...sharedMessageProps,
                                 content: result,
                             } satisfies ClineSayTool)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, completeMessage, undefined, false)
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
+                            await say(Say.TOOL, completeMessage, undefined, false)
                             pushToolResult(result)
                             break
                         }
@@ -541,13 +500,8 @@ export const presentAssistantMessage = async () => {
                                 ...sharedMessageProps,
                                 content: "",
                             } satisfies ClineSayTool)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, partialMessage, undefined, block.partial)
-                            } else {
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                                await ask(Ask.TOOL, partialMessage, block.partial)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
+                            await say(Say.TOOL, partialMessage, undefined, block.partial)
                             break
                         } else {
                             if (!relDirPath) {
@@ -568,11 +522,8 @@ export const presentAssistantMessage = async () => {
                                 ...sharedMessageProps,
                                 content: results,
                             } satisfies ClineSayTool)
-                            if (shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.TOOL)
-                                await say(Say.TOOL, completeMessage, undefined, false)
-                                removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
-                            }
+                            removeLastPartialMessageIfExistsWithType(MessageType.SAY, Say.TOOL)
+                            await say(Say.TOOL, completeMessage, undefined, false)
                             pushToolResult(results)
                             break
                         }
@@ -583,16 +534,8 @@ export const presentAssistantMessage = async () => {
                 }
                 case "execute_command": {
                     const command: string | undefined = block.params.command
-                    const requiresApprovalRaw: string | undefined = block.params.requires_approval
-                    const requiresApproval = requiresApprovalRaw?.toLowerCase() === "true"
-
                     try {
                         if (block.partial) {
-                            if (shouldAutoApproveTool(block.name)) {
-                                // 自動承認の場合、特に追加処理はしない
-                            } else {
-                                await ask(Ask.COMMAND, removeClosingTag("command", command), block.partial).catch(() => {})
-                            }
                             break
                         } else {
                             if (!command) {
@@ -601,33 +544,13 @@ export const presentAssistantMessage = async () => {
                                 await saveCheckpoint()
                                 break
                             }
-                            if (!requiresApprovalRaw) {
-                                state.consecutiveMistakeCount++
-                                pushToolResult(
-                                    await sayAndCreateMissingParamError("execute_command", "requires_approval"),
-                                )
-                                await saveCheckpoint()
-                                break
-                            }
                             state.consecutiveMistakeCount = 0
 
-                            let didAutoApprove = false
-
-                            if (!requiresApproval && shouldAutoApproveTool(block.name)) {
-                                removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.COMMAND)
-                                await say(Say.COMMAND, command, undefined, false)
-                                didAutoApprove = true
-                            }
-
-                            let timeoutId: NodeJS.Timeout | undefined
-                            timeoutId = setTimeout(() => {
-                                console.log("コマンド実行中: 自動承認されたコマンドが30秒以上実行中です。ご確認ください。")
-                            }, 30_000)
+                            removeLastPartialMessageIfExistsWithType(MessageType.ASK, Ask.COMMAND)
+                            await say(Say.COMMAND, command, undefined, false)
 
                             const [result] = await executeCommandTool(command)
-                            if (timeoutId) {
-                                clearTimeout(timeoutId)
-                            }
+                            console.log(`Tool operation 'execute_command' completed successfully.`);
                             pushToolResult(result)
                             break
                         }
@@ -651,7 +574,7 @@ export const presentAssistantMessage = async () => {
                             }
                             state.consecutiveMistakeCount = 0
 
-                            showSystemNotification({
+                            console.log({
                                 subtitle: "Clineからの質問",
                                 message: question.replace(/\n/g, " "),
                             })
@@ -750,7 +673,7 @@ export const presentAssistantMessage = async () => {
                             }
                             state.consecutiveMistakeCount = 0
 
-                            showSystemNotification({
+                            console.log({
                                 subtitle: "タスク完了",
                                 message: result.replace(/\n/g, " "),
                             })

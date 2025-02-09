@@ -16,10 +16,6 @@ export function logError(message: string): void {
   fs.appendFileSync('ai_interaction.log', `${timestamp} [ERROR] ${message}\n`);
 }
 
-export const shouldAutoApproveTool = (toolName: ToolUseName): boolean => {
-	return true
-}
-
 export function getTruncatedMessages(
 	messages: Anthropic.Messages.MessageParam[],
 	deletedRange: [number, number] | undefined,

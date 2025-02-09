@@ -1,12 +1,9 @@
-import delay from "delay"
 import { ToolResponse } from "../types.js";
-import { ask } from "../chat.js";
 import { formatResponse } from "../prompts/responses.js";
 import { say } from "../tasks.js";
-import { Ask, Say } from "../database.js";
+import { Say } from "../database.js";
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { error } from "console";
 
 const execAsync = promisify(exec);
 
