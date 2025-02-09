@@ -1,19 +1,35 @@
 import { ClineAskResponse } from "./types.js";
 import { globalStateManager } from "./globalState.js";
 import { addToClineMessages } from "./tasks.js";
-import pWaitFor from "p-wait-for";
-import { prompt } from "./readline.js";
 import { Ask, MessageType } from "./database.js";
+import * as readline from 'readline';
+
+const requireAnswer = async (text: string) => {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = await new Promise<string>((resolve) => {
+      rl.question(text, resolve);
+    });
+    const state = globalStateManager.state;
+    state.askResponse = "yesButtonClicked";
+    state.askResponseText = answer;
+    state.askResponseImages = "";
+  } catch (err) {
+    console.error('エラーが発生しました:', err);
+  } finally {
+    rl.close();
+  }
+};
+
 
 /**
  * askResponse 関連の状態をクリアする
  */
 function clearAskResponse(): void {
-  globalStateManager.updateState({
-    askResponse: undefined,
-    askResponseText: undefined,
-    askResponseImages: undefined,
-  });
+  const state = globalStateManager.state
+  state.askResponse = undefined
+  state.askResponseText = undefined
+  state.askResponseImages = undefined
 }
 
 /**
@@ -40,9 +56,7 @@ export const ask = async (
   text?: string,
   partial?: boolean
 ): Promise<{ response: ClineAskResponse; text?: string; images?: string }> => {
-  // 念のため askResponse 系をクリア
   clearAskResponse();
-
   let askTs = 0;
   const state = globalStateManager.state;
   const clineMessages = state.clineMessages;
@@ -52,6 +66,10 @@ export const ask = async (
     lastMessage.partial &&
     lastMessage.type === "ask" &&
     lastMessage.ask === type;
+
+  state.askResponse = "yesButtonClicked";
+  state.askResponseText = "yes";
+  state.askResponseImages = "";
 
   if (partial !== undefined) {
     if (partial) {
@@ -65,6 +83,11 @@ export const ask = async (
           type: "partialMessage",
           partialMessage: lastMessage,
         });
+        if (text) {
+          // テキストがある場合は応答を求める
+          clearAskResponse();
+          await requireAnswer(text);
+        }
       } else {
         // 新規 partial メッセージの場合は、追加後にエラーをスローして以降の処理を中断
         askTs = Date.now();
@@ -82,11 +105,15 @@ export const ask = async (
       // partial === false の場合（＝既存の部分メッセージを完結させる）
       if (isUpdatingPreviousPartial) {
         // 既存の部分メッセージがあるなら complete 状態に更新
-        clearAskResponse();
         askTs = lastMessage.ts;
         lastMessage.text = text;
         lastMessage.partial = false;
         updateLastClineMessage(lastMessage);
+        if (text) {
+          // テキストがある場合は応答を求める
+          clearAskResponse();
+          await requireAnswer(text);
+        }
       } else {
         // 新規の complete メッセージとして追加
         askTs = Date.now();
@@ -111,44 +138,13 @@ export const ask = async (
     });
   }
 
-  // 後続の処理でこの ask に対する応答が globalStateManager.askResponse に設定されるのを待つ
-  const res = await prompt("続きを実行しますか？");
-  console.log("res:", res);
-    if (res === "yes") {
-        console.log("続きを実行します");
-        globalStateManager.updateState({ 
-            askResponse: "yesButtonClicked",
-            askResponseText: "yes",
-            askResponseImages: "",
-        });
-    } else {
-        console.log("処理を中断します");
-        globalStateManager.updateState({ 
-            askResponse: "noButtonClicked",
-            askResponseText: "no",
-            askResponseImages: "",
-        });
-    }
-  await pWaitFor(
-    () => {
-      const currentState = globalStateManager.state;
-      return currentState.askResponse !== undefined || currentState.lastMessageTs !== askTs;
-    },
-    { interval: 100 }
-  );
-
-  const updatedState = globalStateManager.state;
-  if (updatedState.lastMessageTs !== askTs) {
+  if (state.lastMessageTs !== askTs) {
     throw new Error("Current ask promise was ignored");
   }
   const result = {
-    response: updatedState.askResponse!,
-    text: updatedState.askResponseText,
-    images: updatedState.askResponseImages,
+    response: state.askResponse,
+    text: state.askResponseText,
+    images: state.askResponseImages,
   };
-
-  // 結果取得後、askResponse 関連の状態をクリア
-  clearAskResponse();
-
   return result;
 };

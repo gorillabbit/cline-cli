@@ -190,18 +190,7 @@ export const presentAssistantMessage = async () => {
 
             // ツール使用前にユーザーに承認を求める関数
             const askApproval = async (type: Ask, partialMessage?: string) => {
-                const { response, text, images } = await ask(type, partialMessage, false)
-                if (response !== "yesButtonClicked") {
-                    if (response === "messageResponse") {
-                        await say(Say.USER_FEEDBACK, text, images)
-                        pushToolResult(formatResponse.toolResult(formatResponse.toolDeniedWithFeedback(text), images))
-                        state.didRejectTool = true
-                        return false
-                    }
-                    pushToolResult(formatResponse.toolDenied())
-                    state.didRejectTool = true
-                    return false
-                }
+                await ask(type, partialMessage, false)
                 return true
             }
 
@@ -688,11 +677,7 @@ export const presentAssistantMessage = async () => {
                                     await saveCheckpoint()
                                 }
 
-                                const didApprove = await askApproval(Ask.COMMAND, command)
-                                if (!didApprove) {
-                                    await saveCheckpoint()
-                                    break
-                                }
+                                await askApproval(Ask.COMMAND, command)
                                 const [execCommandResult] = await executeCommandTool(command!)
                                 commandResult = execCommandResult
                             } else {
@@ -702,7 +687,11 @@ export const presentAssistantMessage = async () => {
                             }
 
                             const { response, text, images } = await ask(Ask.COMPLETION_RESULT, "", false)
+                            console.log("ユーザーの完了試行フィードバック: ", response)
+                            console.log("ユーザーの完了試行テキスト: ", text)
+                            console.log("ユーザーの完了試行画像: ", images)
                             if (response === "yesButtonClicked") {
+                                console.log("再帰ループ停止のシグナルを送信します。")
                                 pushToolResult("") // 再帰ループ停止のシグナル
                                 break
                             }
