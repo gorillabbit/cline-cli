@@ -1,33 +1,9 @@
 import { ApiProvider, ModelInfo } from "./shared/api.js";
 import { ChatSettings } from "./shared/ChatSettings.js";
 import { HistoryItem } from "./shared/HistoryItem.js";
+import { ClineConfig } from "./tasks.js";
 
-export interface ApiState {
-    apiProvider: ApiProvider,
-    apiModelId: string,
-    apiKey: string,
-    openRouterApiKey: string,
-    awsAccessKey: string,
-    awsSecretKey: string,
-    awsSessionToken: string,
-    awsRegion: string,
-    awsUseCrossRegionInference: boolean,
-    vertexProjectId: string,
-    vertexRegion: string,
-    openAiBaseUrl: string,
-    openAiApiKey: string,
-    openAiModelId: string,
-    ollamaModelId: string,
-    ollamaBaseUrl: string,
-    lmStudioModelId: string,
-    lmStudioBaseUrl: string,
-    anthropicBaseUrl: string,
-    geminiApiKey: string,
-    openAiNativeApiKey: string,
-    deepSeekApiKey: string,
-    mistralApiKey: string,
-    azureApiVersion: string,
-    openRouterModelId: string,
+export interface ApiState extends ClineConfig {
     openRouterModelInfo: ModelInfo,
     lastShownAnnouncementId: string,
     customInstructions: string,

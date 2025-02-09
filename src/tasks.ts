@@ -1,17 +1,42 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { taskBaseDir, GlobalFileNames } from './const.js';
+import { taskBaseDir, GlobalFileNames, configPath } from './const.js';
 import { Anthropic } from "@anthropic-ai/sdk"
 import { globalStateManager } from './globalState.js';
-import { ClineAsk, ClineSay, ToolUseName } from './types.js';
-import { getApiMetrics } from './shared/getApiMetrics.js';
-import getFolderSize from 'get-folder-size';
-import { findLastIndex } from './shared/array.js';
-import { combineApiRequests } from './shared/combineApiRequests.js';
+import { ToolUseName } from './types.js';
 import { HistoryItem } from './shared/HistoryItem.js';
 import { formatResponse } from './prompts/responses.js';
-import { combineCommandSequences } from './clineUtils.js';
 import { AppDataSource, Ask, ClineMessage, MessageType, Say } from './database.js';
+import { ApiProvider } from './shared/api.js';
+import { fileExistsAtPath } from './utils/fs.js';
+
+export interface ClineConfig {
+  apiProvider: ApiProvider,
+  apiModelId: string,
+  apiKey: string,
+  openRouterApiKey: string,
+  awsAccessKey: string,
+  awsSecretKey: string,
+  awsSessionToken: string,
+  awsRegion: string,
+  awsUseCrossRegionInference: boolean,
+  vertexProjectId: string,
+  vertexRegion: string,
+  openAiBaseUrl: string,
+  openAiApiKey: string,
+  openAiModelId: string,
+  ollamaModelId: string,
+  ollamaBaseUrl: string,
+  lmStudioModelId: string,
+  lmStudioBaseUrl: string,
+  anthropicBaseUrl: string,
+  geminiApiKey: string,
+  openAiNativeApiKey: string,
+  deepSeekApiKey: string,
+  mistralApiKey: string,
+  azureApiVersion: string,
+  openRouterModelId: string,
+}
 
 /**
  * 指定したtaskIdに対応するタスクディレクトリを作成し、必要なファイルを準備します。
@@ -24,12 +49,44 @@ export const ensureTaskDirectoryExists = async (
 ) => {
   try {
     // 現在のグローバルステートにtaskIdを設定
-    globalStateManager.updateState({ taskId });
+    globalStateManager.state.taskId = taskId;
     const taskDir = path.join(taskBaseDir, taskId);
 
     // タスクディレクトリが存在しない場合は再帰的に作成
     await fs.mkdir(taskDir, { recursive: true });
 
+    // コンフィグファイルが存在しない場合は作成
+    if (!(await fileExistsAtPath(configPath))) {
+      const defaultConfig:ClineConfig = {
+        apiProvider: "openai",
+        apiKey: "",
+        geminiApiKey: "",
+        apiModelId: '',
+        openRouterApiKey: '',
+        awsAccessKey: '',
+        awsSecretKey: '',
+        awsSessionToken: '',
+        awsRegion: '',
+        awsUseCrossRegionInference: false,
+        vertexProjectId: '',
+        vertexRegion: '',
+        openAiBaseUrl: '',
+        openAiApiKey: '',
+        openAiModelId: '',
+        ollamaModelId: '',
+        ollamaBaseUrl: '',
+        lmStudioModelId: '',
+        lmStudioBaseUrl: '',
+        anthropicBaseUrl: '',
+        openAiNativeApiKey: '',
+        deepSeekApiKey: '',
+        mistralApiKey: '',
+        azureApiVersion: '',
+        openRouterModelId: ''
+      };
+      await fs.writeFile(configPath, JSON.stringify(defaultConfig));
+    }
+    
     // 必要なファイルが無い場合は空のデータを書き込んで作成する
     for (const file of Object.values(GlobalFileNames)) {
       const filePath = path.join(taskDir, file);
@@ -37,7 +94,7 @@ export const ensureTaskDirectoryExists = async (
     }
 
     // グローバルステートにタスクディレクトリを登録
-    globalStateManager.updateState({ taskDir });
+    globalStateManager.state.taskDir = taskDir;
   } catch (error) {
     console.error("タスクディレクトリの作成に失敗しました:", error);
   }
