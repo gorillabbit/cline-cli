@@ -15,7 +15,7 @@ export interface GlobalState {
   lastMessageTs?: number;
   askResponse?: ClineAskResponse
 	askResponseText?: string
-	askResponseImages?: string[]
+	askResponseImages?: string
   taskHistory: HistoryItem[];
   isInitialized?: boolean;
   chatSettings: ChatSettings

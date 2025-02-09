@@ -3,6 +3,7 @@ import { ToolResponse } from "../types.js";
 import { ask } from "../chat.js";
 import { formatResponse } from "../prompts/responses.js";
 import { say } from "../tasks.js";
+import { Ask, Say } from "../database.js";
 
 
 /**
@@ -12,11 +13,11 @@ import { say } from "../tasks.js";
  */
 export const executeCommandTool = async (command: string): Promise<[boolean, ToolResponse]> => {
     console.log("executeCommandTool started", { command }); // Log: Function execution start with command
-    let userFeedback: { text?: string; images?: string[] } | undefined
+    let userFeedback: { text?: string; images?: string } | undefined
     let didContinue = false
     const sendCommandOutput = async (line: string): Promise<void> => {
         try {
-            const { response, text, images } = await ask("command_output", line)
+            const { response, text, images } = await ask(Ask.COMMAND_OUTPUT, line)
             if (response === "yesButtonClicked") {
                 // proceed while running
             } else {
@@ -35,7 +36,7 @@ export const executeCommandTool = async (command: string): Promise<[boolean, Too
         if (!didContinue) {
             sendCommandOutput(line)
         } else {
-            await say("command_output", line)
+            await say(Say.COMMAND_OUTPUT, line)
         }
     })
 
@@ -45,7 +46,7 @@ export const executeCommandTool = async (command: string): Promise<[boolean, Too
     })
 
     process.once("no_shell_integration", async () => {
-        await say("shell_integration_warning")
+        await say(Say.SHELL_INTEGRATION_WARNING)
     })
 
     process
@@ -55,7 +56,7 @@ export const executeCommandTool = async (command: string): Promise<[boolean, Too
     result = result.trim()
 
     if (userFeedback) {
-        await say("user_feedback", userFeedback.text, userFeedback.images)
+        await say(Say.USER_FEEDBACK, userFeedback.text, userFeedback.images)
         console.log("executeCommandTool user feedback", { userFeedback }); // Log: User feedback received
         return [
             true,

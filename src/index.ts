@@ -28,6 +28,11 @@ async function main() {
 }
 
 main().catch((error) => {
-    logError(`メイン処理エラー: ${error}`)
+    if (error instanceof Error) {
+        console.error('エラーメッセージ:', error.message);
+        console.error('スタックトレース:', error.stack);
+      } else {
+        console.error('予期しないエラー:', error);
+      }
     process.exit(1)
 })

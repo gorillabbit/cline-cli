@@ -8,13 +8,14 @@ import { getSavedApiConversationHistory, getSavedClineMessages, overwriteApiConv
 import { ask } from "./chat.js"
 import { processClineRequests } from "./tools.js"
 import { findToolName } from "./integrations/misc/export-markdown.js"
+import { Ask, Say } from "./database.js"
 
-export const startTask = async (task?: string, images?: string[]) => {
+export const startTask = async (task?: string, images?: string) => {
     console.log("Task started")
     const state = globalStateManager.state
     state.clineMessages = []
     state.apiConversationHistory = []
-    await say("text", task, images)
+    await say(Say.TEXT, task, images)
     state.isInitialized = true
 
     let imageBlocks: Anthropic.ImageBlockParam[] = formatResponse.imageBlocks(images)
@@ -68,20 +69,20 @@ const resumeTaskFromHistory = async () => {
         .slice()
         .reverse()
         .find((m) => !(m.ask === "resume_task" || m.ask === "resume_completed_task")) // could be multiple resume tasks
-    let askType: ClineAsk
+    let askType: Ask
     if (lastClineMessage?.ask === "completion_result") {
-        askType = "resume_completed_task"
+        askType = Ask.RESUME_COMPLETED_TASK
     } else {
-        askType = "resume_task"
+        askType = Ask.RESUME_TASK
     }
 
     state.isInitialized = true
 
     const { response, text, images } = await ask(askType) // calls poststatetowebview
     let responseText: string | undefined
-    let responseImages: string[] | undefined
+    let responseImages: string | undefined
     if (response === "messageResponse") {
-        await say("user_feedback", text, images)
+        await say(Say.USER_FEEDBACK, text, images)
         responseText = text
         responseImages = images
     }

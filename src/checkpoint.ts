@@ -1,5 +1,4 @@
 import { globalStateManager } from "./globalState.js"
-import { saveClineMessages } from "./tasks.js"
 
 export const saveCheckpoint = async () => {
     const stats = globalStateManager.state
@@ -35,6 +34,5 @@ export const saveCheckpoint = async () => {
             }
         }
         // Save the updated messages
-        await saveClineMessages()
     }
 }

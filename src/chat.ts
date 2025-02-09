@@ -1,8 +1,9 @@
-import { ClineAsk, ClineAskResponse } from "./types.js";
+import { ClineAskResponse } from "./types.js";
 import { globalStateManager } from "./globalState.js";
-import { addToClineMessages, saveClineMessages } from "./tasks.js";
+import { addToClineMessages } from "./tasks.js";
 import pWaitFor from "p-wait-for";
 import { prompt } from "./readline.js";
+import { Ask, MessageType } from "./database.js";
 
 /**
  * askResponse 関連の状態をクリアする
@@ -35,10 +36,10 @@ function updateLastClineMessage(updatedMessage: any): void {
  * 後続で globalStateManager の askResponse が設定されるまで待機し、該当メッセージに対する応答を返します。
  */
 export const ask = async (
-  type: ClineAsk,
+  type: Ask,
   text?: string,
   partial?: boolean
-): Promise<{ response: ClineAskResponse; text?: string; images?: string[] }> => {
+): Promise<{ response: ClineAskResponse; text?: string; images?: string }> => {
   // 念のため askResponse 系をクリア
   clearAskResponse();
 
@@ -70,7 +71,7 @@ export const ask = async (
         state.lastMessageTs = askTs;
         await addToClineMessages({
           ts: askTs,
-          type: "ask",
+          type: MessageType.ASK,
           ask: type,
           text,
           partial: true,
@@ -86,18 +87,13 @@ export const ask = async (
         lastMessage.text = text;
         lastMessage.partial = false;
         updateLastClineMessage(lastMessage);
-        await saveClineMessages();
-        console.log("Partial message completed:", {
-          type: "partialMessage",
-          partialMessage: lastMessage,
-        });
       } else {
         // 新規の complete メッセージとして追加
         askTs = Date.now();
         state.lastMessageTs = askTs;
         await addToClineMessages({
           ts: askTs,
-          type: "ask",
+          type: MessageType.ASK,
           ask: type,
           text,
         });
@@ -109,7 +105,7 @@ export const ask = async (
     state.lastMessageTs = askTs;
     await addToClineMessages({
       ts: askTs,
-      type: "ask",
+      type: MessageType.ASK,
       ask: type,
       text,
     });
@@ -123,14 +119,14 @@ export const ask = async (
         globalStateManager.updateState({ 
             askResponse: "yesButtonClicked",
             askResponseText: "yes",
-            askResponseImages: [],
+            askResponseImages: "",
         });
     } else {
         console.log("処理を中断します");
         globalStateManager.updateState({ 
             askResponse: "noButtonClicked",
             askResponseText: "no",
-            askResponseImages: [],
+            askResponseImages: "",
         });
     }
   await pWaitFor(

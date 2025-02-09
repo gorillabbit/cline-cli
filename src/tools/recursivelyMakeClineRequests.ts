@@ -5,13 +5,14 @@ import { ask } from "../chat.js";
 import { globalStateManager } from "../globalState.js";
 import CheckpointTracker from "../integrations/checkpoints/CheckpointTracker.js";
 import { formatContentBlockToMarkdown } from "../integrations/misc/export-markdown.js";
-import { say, addToApiConversationHistory, saveClineMessages } from "../tasks.js";
+import { say, addToApiConversationHistory } from "../tasks.js";
 import { UserContent, ClineApiReqInfo, ClineApiReqCancelReason } from "../types.js";
 import { attemptApiRequest } from "./attemptApiRequest.js";
 import { loadContext } from "./loadContext.js";
 import { presentAssistantMessage } from "./presentAssistantMessage.js";
 import { apiStateManager } from "../apiState.js";
 import { buildApiHandler } from "../api/index.js";
+import { Ask, Say } from "../database.js";
 
 /**
  * APIリクエストの流れを「ユーザーコンテンツがなくなるまで」ループで処理する簡潔な実装例
@@ -36,7 +37,7 @@ export const processClineRequests = async (
 
     // ── APIリクエストの準備 ──
     const requestText = formatRequest(userContent);
-    await say("api_req_started", JSON.stringify({ request: requestText + "\\n\\nLoading..." }));
+    await say(Say.API_REQ_STARTED, JSON.stringify({ request: requestText + "\\n\\nLoading..." }));
     await initCheckpointTracker();
 
     // 環境コンテキストを読み込み、ユーザーコンテンツに付与する
@@ -44,7 +45,6 @@ export const processClineRequests = async (
     userContent = [...parsedContent, { type: "text", text: envDetails }];
     await addToApiConversationHistory({ role: "user", content: userContent });
     updateLastApiRequestMessage(userContent);
-    await saveClineMessages();
 
     // ── ストリーム処理前の状態リセット ──
     resetStreamingState();
@@ -66,7 +66,6 @@ export const processClineRequests = async (
       content: [{ type: "text", text: assistantMessage }],
     });
     updateLastApiRequestMessageWithUsage(tokenUsage);
-    await saveClineMessages();
 
     // ── ツール使用がなかった場合は、ユーザーにその旨を通知＆ミスカウント更新 ──
     if (!assistantResponseContainsToolUsage()) {
@@ -92,7 +91,7 @@ async function checkLimits(userContent: UserContent): Promise<void> {
     console.log("[エラー] Clineが問題を抱えています。タスクを続行しますか？");
     const apiState = buildApiHandler(apiStateManager.getState());
     const { response, text, images } = await ask(
-      "mistake_limit_reached",
+      Ask.MISTAKE_LIMIT_REACHED,
       apiState.getModel().id.includes("claude")
         ? "思考プロセスの失敗が疑われます。ガイダンスを入力してください。"
         : "複雑なタスクのため、より高性能なモデルが推奨されます。"
@@ -237,7 +236,7 @@ async function handleStreamAbort(
  * アシスタントのレスポンスが空の場合のエラー処理
  */
 async function handleEmptyAssistantResponse(): Promise<void> {
-  await say("error", "予期しないAPIレスポンス: アシスタントメッセージが返されませんでした。");
+  await say(Say.ERROR, "予期しないAPIレスポンス: アシスタントメッセージが返されませんでした。");
   await addToApiConversationHistory({
     role: "assistant",
     content: [{ type: "text", text: "失敗: レスポンスが提供されませんでした。" }],

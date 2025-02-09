@@ -45,11 +45,12 @@ export interface ClineMessage {
     ask?: ClineAsk
     say?: ClineSay
     text?: string
-    images?: string[]
+    images?: string
     partial?: boolean
     lastCheckpointHash?: string
     conversationHistoryIndex?: number
-    conversationHistoryDeletedRange?: [number, number] // for when conversation history is truncated for API requests
+	conversationHistoryDeletedRangeStart?: number
+	conversationHistoryDeletedRangeEnd?: number
 }
 
 export const toolUseNames = [

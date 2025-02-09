@@ -10,12 +10,13 @@ import { getTruncatedMessages } from "../clineUtils.js";
 import { GlobalFileNames } from "../const.js";
 import { globalStateManager } from "../globalState.js";
 import { SYSTEM_PROMPT, addUserInstructions } from "../prompts/system.js";
-import { saveClineMessages, say } from "../tasks.js";
+import { say } from "../tasks.js";
 import { ClineApiReqInfo } from "../types.js";
 import { fileExistsAtPath } from "../utils/fs.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { apiStateManager } from "../apiState.js";
 import { buildApiHandler } from "../api/index.js";
+import { Ask, Say } from "../database.js";
 
 /**
  * APIリクエスト用のシステムプロンプトを構築する
@@ -100,7 +101,6 @@ async function trimHistoryIfNeeded(previousApiReqIndex: number): Promise<void> {
         keep
       );
       state.conversationHistoryDeletedRange = newRange;
-      await saveClineMessages();
     }
   }
 }
@@ -146,13 +146,13 @@ export async function* attemptApiRequest(
       state.didAutomaticallyRetryFailedApiRequest = true;
     } else {
       const { response } = await ask(
-        "api_req_failed",
+        Ask.API_REQ_FAILED,
         error.message ?? JSON.stringify(serializeError(error), null, 2)
       );
       if (response !== "yesButtonClicked") {
         throw new Error("API request failed");
       }
-      await say("api_req_retried");
+      await say(Say.API_REQ_RETRIED);
     }
     yield* attemptApiRequest(previousApiReqIndex);
     return;
