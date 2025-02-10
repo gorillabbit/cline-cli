@@ -33,7 +33,11 @@ export const presentAssistantMessage = async () => {
         throw new Error("Workspace folder not set")
     }
 
-    console.log("1:[プレゼント] 開始"); // ログ: 関数実行開始
+    console.log("1:[presentAssistantMessage] 開始", {
+        locked: state.presentAssistantMessageLocked,
+        pendingUpdates: state.presentAssistantMessageHasPendingUpdates,
+        index: state.currentStreamingContentIndex,
+    }); // ログ: 関数実行開始
 
     // タスク中止が指定されている場合はエラーを投げる
     if (state.abort) {
@@ -43,10 +47,12 @@ export const presentAssistantMessage = async () => {
 
     // メッセージ提示処理がロックされている場合は、更新をフラグに記録して終了
     if (state.presentAssistantMessageLocked) {
-        console.log("2:[プレゼント] presentAssistantMessageLockedがtrueのため、更新を保留します。")
+        console.log("2:[presentAssistantMessage] presentAssistantMessageLockedがtrueのため、更新を保留します。")
+        console.log("Setting presentAssistantMessageHasPendingUpdates to true");
         state.presentAssistantMessageHasPendingUpdates = true
         return
     }
+    console.log("Setting presentAssistantMessageLocked to true");
     state.presentAssistantMessageLocked = true
     state.presentAssistantMessageHasPendingUpdates = false
 
@@ -55,18 +61,20 @@ export const presentAssistantMessage = async () => {
         // ストリーミングが完了している場合、ユーザーメッセージの準備ができたことを示す
         if (state.didCompleteReadingStream) {
             state.userMessageContentReady = true
-            console.log("3:[プレゼント]ストリーミング完了: ユーザーメッセージの準備完了")
+            console.log("3:[presentAssistantMessage]ストリーミング完了: ユーザーメッセージの準備完了")
         }
+        console.log("Setting presentAssistantMessageLocked to false");
         state.presentAssistantMessageLocked = false
         return
     }
 
     // ストリーミング中に配列が更新される可能性があるため、ディープコピーを作成
     const block = cloneDeep(state.assistantMessageContent[state.currentStreamingContentIndex])
-    console.log(`4:[プレゼント]処理中のブロック: `,block)
+    console.log(`4:[presentAssistantMessage]処理中のブロック: `,block)
 
     switch (block.type) {
         case "text": {
+            console.log("Processing text block");
             if (state.didRejectTool || state.didAlreadyUseTool) {
                 console.log("ツールが拒否されたか既に使用済みのため、テキストブロックの処理をスキップ")
                 break
@@ -112,6 +120,7 @@ export const presentAssistantMessage = async () => {
             break
         }
         case "tool_use":
+            console.log("Processing tool_use block:", block.name);
             // ツールごとの説明を生成する関数
             const toolDescription = () => {
                 switch (block.name) {
@@ -592,7 +601,6 @@ export const presentAssistantMessage = async () => {
                                 pushToolResult(await sayAndCreateMissingParamError("plan_mode_response", "response"))
                                 break
                             }
-                            state.consecutiveMistakeCount = 0
                             state.isAwaitingPlanResponse = true
                             const { text, images } = await ask(Ask.PLAN_MODE_RESPONSE, response, false)
                             state.isAwaitingPlanResponse = false
@@ -692,6 +700,7 @@ export const presentAssistantMessage = async () => {
                             console.log("ユーザーの完了試行画像: ", images)
                             if (response === "yesButtonClicked") {
                                 console.log("再帰ループ停止のシグナルを送信します。")
+                                state.taskCompleted = true; // Add this line
                                 pushToolResult("") // 再帰ループ停止のシグナル
                                 break
                             }
@@ -734,24 +743,47 @@ export const presentAssistantMessage = async () => {
     }
 
     // インデックスが範囲外の場合は、ストリーミングが完了しているかチェック
+    console.log("Setting presentAssistantMessageLocked to false");
     state.presentAssistantMessageLocked = false // ロック解除
     if (!block.partial || state.didRejectTool || state.didAlreadyUseTool) {
         if (state.currentStreamingContentIndex === state.assistantMessageContent.length - 1) {
             state.userMessageContentReady = true
-            console.log("[プレゼント] すべてのブロックの処理が完了しました。")
+            console.log("[presentAssistantMessage] すべてのブロックの処理が完了しました。")
         }
         // 次のブロックが存在する場合は再帰的に処理を呼び出す
         state.currentStreamingContentIndex++
         if (state.currentStreamingContentIndex < state.assistantMessageContent.length) {
-            console.log(`[プレゼント] 次のブロック（インデックス: ${state.currentStreamingContentIndex}, ${ state.assistantMessageContent.length}）の処理を再帰的に処理を呼び出し開始します。`)
+            console.log(`[presentAssistantMessage] 次のブロック（インデックス: ${state.currentStreamingContentIndex}, ${ state.assistantMessageContent.length}）の処理を再帰的に処理を呼び出し開始します。`, {
+                locked: state.presentAssistantMessageLocked,
+                pendingUpdates: state.presentAssistantMessageHasPendingUpdates,
+                index: state.currentStreamingContentIndex
+            });
             await presentAssistantMessage()
             return
         }
     }
     // 部分的なブロックであっても、更新が保留されていれば再呼び出し
     if (state.presentAssistantMessageHasPendingUpdates) {
-        console.log("[プレゼント] 保留中の更新があるため、再度presentAssistantMessageを呼び出します。")
+        console.log("[presentAssistantMessage] 保留中の更新があるため、再度presentAssistantMessageを呼び出します。")
         await presentAssistantMessage()
     }
-    console.log("[プレゼント] 終了") // ログ: 関数実行終了
+    console.log("[presentAssistantMessage] 終了") // ログ: 関数実行終了
+}
+
+/**
+ * ストリーム処理前に各種ストリーム関連状態をリセットする
+ */
+function resetStreamingState(): void {
+    const state = globalStateManager.state;
+    state.assistantMessageContent = [];
+    state.didCompleteReadingStream = false;
+    state.userMessageContent = [];
+    state.userMessageContentReady = false;
+    state.didRejectTool = false;
+    state.didAlreadyUseTool = false;
+    state.presentAssistantMessageLocked = false;
+    state.presentAssistantMessageHasPendingUpdates = false;
+    state.didAutomaticallyRetryFailedApiRequest = false;
+    state.currentStreamingContentIndex = 0;
+    state.taskCompleted = false; // Add this line
 }

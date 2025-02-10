@@ -200,7 +200,7 @@ export const addToClineMessages = async (
   message.ts = message.ts ?? Date.now();
   message.taskId = state.taskId;
   const result = await clineMessageRepository.save(message);
-  console.log("Added Cline message:", result);
+  console.log("Added Cline message:", result.text);
   if (message.ts !== undefined) {
     state.clineMessages.push(message as ClineMessage);
   } else {

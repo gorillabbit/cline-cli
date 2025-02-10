@@ -26,9 +26,14 @@ export const processClineRequests = async (
 ): Promise<boolean> => {
   let userContent = initialUserContent;
   const state = globalStateManager.state;
+  let didProcessAssistantMessage = false;
 
   // ユーザーコンテンツが存在する限りループ
   while (userContent.length > 0) {
+    // Added check for task completion
+    if (state.taskCompleted) {
+      return true;
+    }
     // ── 前処理: 中断チェック＆各種リミットの確認 ──
     if (state.abort) {
       throw new Error("Cline instance aborted");
@@ -53,29 +58,34 @@ export const processClineRequests = async (
     const { assistantMessage, tokenUsage, error: streamError } = await processApiStream();
     if (streamError) {
       await handleStreamAbort("streaming_failed", streamError, assistantMessage);
-      return false; // 修正: エラー発生時はループを終了する (falseを返す)
-    }
-    if (!assistantMessage) {
+    } else if (!assistantMessage) {
       await handleEmptyAssistantResponse();
-      return false; // 修正: 空応答の場合もループを終了する (falseを返す)
+    } else {
+      // ── アシスタントレスポンスを会話履歴に追加 ──
+      await addToApiConversationHistory({
+        role: "assistant",
+        content: [{ type: "text", text: assistantMessage }],
+      });
+      updateLastApiRequestMessageWithUsage(tokenUsage);
+      didProcessAssistantMessage = true;
     }
 
-    // ── アシスタントレスポンスを会話履歴に追加 ──
-    await addToApiConversationHistory({
-      role: "assistant",
-      content: [{ type: "text", text: assistantMessage }],
-    });
-    updateLastApiRequestMessageWithUsage(tokenUsage);
+        // 次のリクエスト用のユーザーコンテンツを取得
+        userContent = state.userMessageContent;
 
-    // ── ツール使用がなかった場合は、ユーザーにその旨を通知＆ミスカウント更新 ──
-    if (!assistantResponseContainsToolUsage()) {
+    // ── ツール使用がなかった場合、または完了シグナルの場合は、ループを抜ける ──
+    if (didProcessAssistantMessage && !assistantResponseContainsToolUsage()) {
       updateUserContentNoTool();
+      break;
     }
-
-    // 次のリクエスト用のユーザーコンテンツを取得
-    userContent = state.userMessageContent;
+    if (userContent.length === 1 && userContent[0].type === "text" && userContent[0].text === "") {
+      break;
+    }
+    if (userContent.length === 0) {
+      break;
+    }
   }
-  return true; // 修正: 正常終了時はループを継続する (trueを返す)
+  return !state.abort;
 };
 
 /* ── ヘルパー関数群 ── */
@@ -158,6 +168,7 @@ function resetStreamingState(): void {
     state.presentAssistantMessageHasPendingUpdates = false;
     state.didAutomaticallyRetryFailedApiRequest = false;
     state.currentStreamingContentIndex = 0;
+    state.taskCompleted = false; // Add this line
 }
 
 /**
@@ -265,7 +276,7 @@ function updateLastApiRequestMessageWithUsage(tokenUsage: {
     cacheReads: tokenUsage.cacheReadTokens,
     cost: tokenUsage.totalCost,
   } as ClineApiReqInfo);
-  console.log("[updateLastApiRequestMessageWithUsage] APIリクエストメッセージを更新しました:", messages[lastIndex]);
+  console.log("[updateLastApiRequestMessageWithUsage] APIリクエストメッセージを更新しました:");
 }
 
 /**

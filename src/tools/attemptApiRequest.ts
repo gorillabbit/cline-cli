@@ -91,7 +91,7 @@ async function trimHistoryIfNeeded(previousApiReqIndex: number): Promise<void> {
     const apiHandler = buildApiHandler(apiStateManager.getState());
     const maxAllowed = getMaxAllowedTokens(apiHandler);
 
-    console.log(`[trimHistoryIfNeeded] トークン合計: ${totalTokens} / 最大許容: ${maxAllowed}, テキスト: ${previousRequest.text}`);
+    console.log(`[trimHistoryIfNeeded] トークン合計: ${totalTokens} / 最大許容: ${maxAllowed}`);
     if (totalTokens >= maxAllowed) {
       console.log("[trimHistoryIfNeeded] コンテキストウィンドウに近づいたため、履歴をトリミングします。");
       const keep = totalTokens / 2 > maxAllowed ? "quarter" : "half";

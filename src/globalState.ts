@@ -44,6 +44,7 @@ export interface GlobalState {
   didRespondToPlanAskBySwitchingMode?: boolean;
   db?: Database;
   abandoned?: boolean;
+  taskCompleted: boolean;
 }
   
 class GlobalStateManager {
@@ -76,6 +77,7 @@ class GlobalStateManager {
     didAutomaticallyRetryFailedApiRequest: false,
     db: undefined,
     abandoned: false,
+    taskCompleted: false,
   };
 
   private constructor() {}
