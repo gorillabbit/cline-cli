@@ -2,12 +2,12 @@
 
 ```mermaid
 graph TD
-    A[Start Task] --> B(initiateTaskLoop);
+    A(Start Task) --> B(initiateTaskLoop);
     B --> C{User Content?};
-    C -- Yes --> D(processClineRequests);
-    C -- No --> E["End Loop (No User Content)"];
+    C -- Yes --> D((processClineRequests));
+    C -- No --> E("End Loop (No User Content)");
     D --> F{Task Completed?};
-    F -- Yes --> G["End Loop (Task Completed)"];
+    F -- Yes --> G("End Loop (Task Completed)");
     F -- No --> H{Abort?};
     H -- Yes --> G;
     H -- No --> I(checkLimits);
@@ -36,7 +36,14 @@ graph TD
     E --> Z;
 ```
 
-## Workflow Description
+## アプリケーションの目的
+
+このアプリケーション (cline-cli) は、AIモデルを活用して様々なタスクを自動化するためのCLIツールです。ユーザーはコマンドラインから指示を与えることで、ファイルの編集、コード生成、システム操作など、多岐にわたる作業をAIに実行させることができます。
+
+このツールの主な目的は、AIの能力を最大限に引き出し、ユーザーの作業効率を飛躍的に向上させることです。複雑なタスクを自動化し、反復作業から解放することで、ユーザーはより創造的で重要な業務に集中できるようになります。
+
+
+## ワークフローの説明
 
 ワークフローは \`startTask\` 関数から始まり、タスクを初期化し、\`initiateTaskLoop\` 内のメインループを開始します。
 
