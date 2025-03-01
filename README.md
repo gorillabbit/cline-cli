@@ -1,73 +1,53 @@
 # Cline-CLI
 
-clineからフォークした、CLI上で動作するアプリケーション
+A CLI application for AI agents, forked from Cline.
 
-```sh
- npm run compile && npx node build/index.js /home/gorillabbit/cline-cli "プレビューしても図にならないので修正して" gemini
- ```
+## Features
 
-## このアプリについて
+*   CLI-based operation
+*   Simplified logic compared to the original Cline
+*   Waits for full responses instead of streaming
+*   No human feedback or confirmation required
+*   Designed for AI agents
+*   Stores conversation history in SQLite
 
-このアプリは、clineからフォークされた、CLI上で動作するアプリケーションです。本家のClineに比べて、よりシンプルな構造になっているのが特徴です。
-
-具体的には、ストリーミングではなくレスポンスが全部返ってくるまで待つ、人間によるフィードバックを極力求めない、といった点が挙げられます。
-
-このアプリは、プロンプトとワークスペースフォルダを入力として受け取り、AIプロバイダー（OpenAI、Geminiなど）を使用してプロンプトを処理し、ワークスペースでコマンドを実行する可能性があります。複数のAIプロバイダーをサポートし、各プロバイダーのAPIキーが必要です。設定は `config.json` ファイルに保存されます。また、安全なコマンド（許可されたコマンドのホワイトリストにあるコマンド）のみを実行できます。実行ごとにタスクディレクトリを作成し、APIの会話履歴やその他の関連ファイルを保存します。
-
-## 本家との差異
-
-- cliで動作する
-- VScodeの機能を使用しない
-- AIとの通信をストリーミングではなくレスポンスを待つことによりロジックを大幅に簡略化
-- 人間によるフィードバックを求めない。確認機能や、承認機能はない
-- Agent向きのプロンプト
-- チェックポイント機能がない
-- MCPサーバーを使えない
-- 会話履歴をjsonではなくsqliteに保存する
-
-このような差がありますが、それ故によりAgentとして様々なアプリケーションに組み込みやすく、また初心者でもロジックを理解して改善できます。
-
-## インストール
+## Installation
 
 ```bash
 npm install
 npm run compile
 ```
 
-## 使い方
+## Usage
 
 ```bash
 npx node build/index.js /path/to/your/project "your prompt" gemini
 ```
 
-*   `/path/to/your/project`: プロジェクトのパス
-*   `"your prompt"`: プロンプト
-*   `gemini`: 使用するAIプロバイダー
+*   `/path/to/your/project`: Path to the project
+*   `"your prompt"`: Prompt for the AI agent
+*   `gemini`: AI provider to use
 
-## ライセンス
+## Contributing
+
+Contributions are welcome!
+
+*   Report issues on GitHub Issues
+*   Submit pull requests for new features or bug fixes
+*   Follow the project's code style
+
+## License
 
 MIT License
 
-## 貢献
-
-貢献は大歓迎です！以下の方法で貢献できます。
-
-*   **Issueを報告する:** バグや改善要望があれば、GitHub Issuesで報告してください。
-*   **プルリクエストを送信する:** 機能追加やバグ修正のプルリクエストをお待ちしています。
-*   **コードスタイル:** このプロジェクトのコードスタイルに従ってください。
-
-## 行動規範
-
-AIAgentのための誰でも使いやすいOSSを作ること
-
-## 連絡先
+## Contact
 
 modsyoukaizenryoku@gmail.com
 
-## クレジット
+## Credits
 
 take
 
-## プロジェクトのステータス
+## Project Status
 
-開発中
+Under development
