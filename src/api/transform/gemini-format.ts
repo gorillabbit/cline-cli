@@ -45,7 +45,7 @@ export function convertAnthropicContentToGemini(
 						args: block.input,
 					},
 				} as FunctionCallPart
-			case "tool_result":
+			case "tool_result": {
 				const name = block.tool_use_id.split("-")[0]
 				if (!block.content) {
 					return []
@@ -87,8 +87,9 @@ export function convertAnthropicContentToGemini(
 						),
 					]
 				}
+			}
 			default:
-				throw new Error(`Unsupported content block type: ${(block as any).type}`)
+				throw new Error(`Unsupported content block type: ${block}`)
 		}
 	})
 }
@@ -110,8 +111,8 @@ export function convertAnthropicToolToGemini(tool: Anthropic.Messages.Tool): Fun
 				Object.entries(tool.input_schema.properties || {}).map(([key, value]) => [
 					key,
 					{
-						type: (value as any).type.toUpperCase(),
-						description: (value as any).description || "",
+						type: value.type.toUpperCase(),
+						description: value.description || "",
 					},
 				]),
 			),

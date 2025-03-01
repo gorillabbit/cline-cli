@@ -5,10 +5,10 @@ export { parseAssistantMessage } from "./parse-assistant-message.js"
 export interface TextContent {
 	type: "text"
 	content: string
-	partial: boolean
 }
 
 export const toolUseNames = [
+	"edit_issue",
 	"execute_command",
 	"read_file",
 	"write_to_file",
@@ -28,11 +28,11 @@ export const toolUseNames = [
 export type ToolUseName = (typeof toolUseNames)[number]
 
 export const toolParamNames = [
+	"issue_number",
 	"command",
 	"requires_approval",
 	"path",
 	"content",
-	"diff",
 	"regex",
 	"file_pattern",
 	"recursive",
@@ -47,6 +47,8 @@ export const toolParamNames = [
 	"question",
 	"response",
 	"result",
+	"search",
+	"replace",
 ] as const
 
 export type ToolParamName = (typeof toolParamNames)[number]
@@ -56,7 +58,6 @@ export interface ToolUse {
 	name: ToolUseName
 	// params is a partial record, allowing only some or none of the possible parameters to be used
 	params: Partial<Record<ToolParamName, string>>
-	partial: boolean
 }
 
 export interface ExecuteCommandToolUse extends ToolUse {
@@ -77,7 +78,7 @@ export interface WriteToFileToolUse extends ToolUse {
 
 export interface ReplaceInFileToolUse extends ToolUse {
 	name: "replace_in_file"
-	params: Partial<Pick<Record<ToolParamName, string>, "path" | "diff">>
+	params: Partial<Pick<Record<ToolParamName, string>, "path" | "search" | "replace">>
 }
 
 export interface SearchFilesToolUse extends ToolUse {

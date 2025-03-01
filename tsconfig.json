@@ -4,11 +4,7 @@
 		"experimentalDecorators": true,
 		"forceConsistentCasingInFileNames": true,
 		"isolatedModules": true,
-		"lib": [
-			"es2022",
-			"esnext.disposable",
-			"DOM"
-		],
+		"lib": ["es2022", "esnext.disposable", "DOM"],
 		"module": "esnext",
 		"moduleResolution": "Bundler",
 		"noFallthroughCasesInSwitch": true,
@@ -24,13 +20,8 @@
 		"target": "es2022",
 		"useDefineForClassFields": true,
 		"useUnknownInCatchVariables": false,
-		"emitDecoratorMetadata": true,
+		"emitDecoratorMetadata": true
 	},
-	"include": [
-		"src/**/*"
-	],
-	"exclude": [
-		"node_modules",
-		"src/test/**/*"
-	]
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "src/test/**/*"]
 }

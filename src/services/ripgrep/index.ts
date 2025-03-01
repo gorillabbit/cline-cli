@@ -1,8 +1,6 @@
 import * as childProcess from "child_process"
 import * as path from "path"
-import * as fs from "fs"
 import * as readline from "readline"
-import { globalStoragePath } from "../../const.js"
 
 /*
 This file provides functionality to perform regex searches on files using ripgrep.
@@ -46,9 +44,6 @@ rel/path/to/helper.ts
 │----
 */
 
-const isWindows = /^win/.test(process.platform)
-const binName = isWindows ? "rg.exe" : "rg"
-
 interface SearchResult {
 	file: string
 	line: number
@@ -59,28 +54,6 @@ interface SearchResult {
 }
 
 const MAX_RESULTS = 300
-
-async function getBinPath(vscodeAppRoot: string): Promise<string | undefined> {
-	const checkPath = async (pkgFolder: string) => {
-		const fullPath = path.join(vscodeAppRoot, pkgFolder, binName)
-		return (await pathExists(fullPath)) ? fullPath : undefined
-	}
-
-	return (
-		(await checkPath("node_modules/@vscode/ripgrep/bin/")) ||
-		(await checkPath("node_modules/vscode-ripgrep/bin")) ||
-		(await checkPath("node_modules.asar.unpacked/vscode-ripgrep/bin/")) ||
-		(await checkPath("node_modules.asar.unpacked/@vscode/ripgrep/bin/"))
-	)
-}
-
-async function pathExists(path: string): Promise<boolean> {
-	return new Promise((resolve) => {
-		fs.access(path, (err) => {
-			resolve(err === null)
-		})
-	})
-}
 
 async function execRipgrep(bin: string, args: string[]): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -123,7 +96,6 @@ async function execRipgrep(bin: string, args: string[]): Promise<string> {
 }
 
 export async function regexSearchFiles(cwd: string, directoryPath: string, regex: string, filePattern?: string): Promise<string> {
-	const vscodeAppRoot = globalStoragePath
 	const rgPath = "/usr/bin/rg"
 
 	if (!rgPath) {

@@ -1,36 +1,36 @@
 import fs from "fs/promises"
 import * as path from "path"
-import { configPath } from '../const.js';
-import { ClineConfig } from "../tasks.js";
-import { apiStateManager } from "../apiState.js";
+import { configPath } from "../const.js"
+import { ClineConfig } from "../tasks.js"
+import { apiStateManager } from "../apiState.js"
 
 export async function getConfig(): Promise<ClineConfig | undefined> {
-    try {
-        const data = await fs.readFile(configPath, 'utf-8');
-        const config: ClineConfig = JSON.parse(data);
-        apiStateManager.updateState(config);
-        return config;
-    } catch (error) {
-        console.error("Error reading config from file:", error);
-        return undefined;
-    }
+	try {
+		const data = await fs.readFile(configPath, "utf-8")
+		const config: ClineConfig = JSON.parse(data)
+		apiStateManager.updateState(config)
+		return config
+	} catch (error) {
+		console.error("Error reading config from file:", error)
+		return undefined
+	}
 }
 
 export async function setConfig(input: Partial<ClineConfig>): Promise<void> {
-    try {
-        const currentConfig = await getConfig();
+	try {
+		const currentConfig = await getConfig()
 		if (!currentConfig) {
-			throw new Error("No config file found");
+			throw new Error("No config file found")
 		}
-        const config: ClineConfig = {
+		const config: ClineConfig = {
 			...currentConfig,
-			...input
-		};
-		apiStateManager.updateState(config);
-        await fs.writeFile(configPath, JSON.stringify(config, null, 2));
-    } catch (error) {
-        console.error("Error writing API key to config file:", error);
-    }
+			...input,
+		}
+		apiStateManager.updateState(config)
+		await fs.writeFile(configPath, JSON.stringify(config, null, 2))
+	} catch (error) {
+		console.error("Error writing API key to config file:", error)
+	}
 }
 
 /**

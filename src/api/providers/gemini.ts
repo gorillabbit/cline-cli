@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { ApiHandler } from ".."
 import { ApiHandlerOptions, geminiDefaultModelId, GeminiModelId, geminiModels, ModelInfo } from "../../shared/api.js"
 import { convertAnthropicMessageToGemini } from "../transform/gemini-format.js"
-import { ApiStream } from "../transform/stream.js"
+import { ApiResponse } from "../transform/stream.js"
 
 export class GeminiHandler implements ApiHandler {
 	private options: ApiHandlerOptions
@@ -17,30 +17,25 @@ export class GeminiHandler implements ApiHandler {
 		this.client = new GoogleGenerativeAI(options.geminiApiKey)
 	}
 
-	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
+	async createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiResponse {
 		const model = this.client.getGenerativeModel({
 			model: this.getModel().id,
 			systemInstruction: systemPrompt,
 		})
-		const result = await model.generateContentStream({
+
+		const content = await model.generateContent({
 			contents: messages.map(convertAnthropicMessageToGemini),
 			generationConfig: {
 				temperature: 0,
 			},
 		})
-
-		for await (const chunk of result.stream) {
-			yield {
-				type: "text",
-				text: chunk.text(),
-			}
-		}
-
-		const response = await result.response
-		yield {
-			type: "usage",
-			inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
-			outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+		const response = content.response
+		return {
+			text: response.text(),
+			usage: {
+				inputTokens: response.usageMetadata?.promptTokenCount ?? 0,
+				outputTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+			},
 		}
 	}
 

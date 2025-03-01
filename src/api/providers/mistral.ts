@@ -1,15 +1,9 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 import { Mistral } from "@mistralai/mistralai"
 import { ApiHandler } from ".."
-import {
-	ApiHandlerOptions,
-	mistralDefaultModelId,
-	MistralModelId,
-	mistralModels,
-	ModelInfo,
-} from "../../shared/api.js"
+import { ApiHandlerOptions, mistralDefaultModelId, MistralModelId, mistralModels, ModelInfo } from "../../shared/api.js"
 import { convertToMistralMessages } from "../transform/mistral-format.js"
-import { ApiStream } from "../transform/stream.js"
+import { ApiResponse } from "../transform/stream.js"
 
 export class MistralHandler implements ApiHandler {
 	private options: ApiHandlerOptions
@@ -23,37 +17,21 @@ export class MistralHandler implements ApiHandler {
 		})
 	}
 
-	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
-		const stream = await this.client.chat.stream({
+	async createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiResponse {
+		const response = await this.client.chat.complete({
 			model: this.getModel().id,
 			// max_completion_tokens: this.getModel().info.maxTokens,
 			temperature: 0,
 			messages: [{ role: "system", content: systemPrompt }, ...convertToMistralMessages(messages)],
-			stream: true,
 		})
-
-		for await (const chunk of stream) {
-			const delta = chunk.data.choices[0]?.delta
-			if (delta?.content) {
-				let content: string = ""
-				if (typeof delta.content === "string") {
-					content = delta.content
-				} else if (Array.isArray(delta.content)) {
-					content = delta.content.map((c) => (c.type === "text" ? c.text : "")).join("")
-				}
-				yield {
-					type: "text",
-					text: content,
-				}
-			}
-
-			if (chunk.data.usage) {
-				yield {
-					type: "usage",
-					inputTokens: chunk.data.usage.promptTokens || 0,
-					outputTokens: chunk.data.usage.completionTokens || 0,
-				}
-			}
+		return {
+			text: Array.isArray(response.choices?.[0]?.message.content)
+				? response.choices[0].message.content.join("")
+				: response.choices?.[0]?.message.content || "",
+			usage: {
+				inputTokens: response.usage?.promptTokens || 0,
+				outputTokens: response.usage?.completionTokens || 0,
+			},
 		}
 	}
 

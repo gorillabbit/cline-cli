@@ -25,7 +25,7 @@ class CheckpointTracker {
 			// Check if git is installed by attempting to get version
 			try {
 				await simpleGit().version()
-			} catch (error) {
+			} catch {
 				throw new Error("Git must be installed to use checkpoints.") // FIXME: must match what we check for in TaskHeader to show link
 			}
 
@@ -41,7 +41,7 @@ class CheckpointTracker {
 
 	private static async getWorkingDirectory(): Promise<string> {
 		const state = globalStateManager.state
-		const cwd =state.workspaceFolder
+		const cwd = state.workspaceFolder
 		if (!cwd) {
 			throw new Error("No workspace detected. Please open Cline in a workspace to use checkpoints.")
 		}
@@ -299,8 +299,8 @@ class CheckpointTracker {
 			let beforeContent = ""
 			try {
 				beforeContent = await git.show([`${baseHash}:${filePath}`])
-			} catch (_) {
-				// file didn't exist in older commit => remains empty
+			} catch (error) {
+				console.error(`File not found in commit ${baseHash} for file ${filePath}:`, error)
 			}
 
 			let afterContent = ""
@@ -308,15 +308,15 @@ class CheckpointTracker {
 				// if user provided a newer commit, use git.show at that commit
 				try {
 					afterContent = await git.show([`${rhsHash}:${filePath}`])
-				} catch (_) {
-					// file didn't exist in newer commit => remains empty
+				} catch (error) {
+					console.error(`File not found in commit ${rhsHash} for file ${filePath}:`, error)
 				}
 			} else {
 				// otherwise, read from disk (includes uncommitted changes)
 				try {
 					afterContent = await fs.readFile(absolutePath, "utf8")
-				} catch (_) {
-					// file might be deleted => remains empty
+				} catch (error) {
+					console.error(`Failed to read after content for ${absolutePath}:`, error)
 				}
 			}
 

@@ -1,19 +1,18 @@
-import * as fs from 'fs';
-import { ToolUseName } from './assistant-message';
-import Anthropic from '@anthropic-ai/sdk';
-import { ClineMessage } from './types.js';
+import * as fs from "fs"
+import Anthropic from "@anthropic-ai/sdk"
+import { ClineMessage } from "./types.js"
 
 // シンプルなログ関数。必要に応じて winston などのライブラリに置換可能。
 export function log(message: string): void {
-  const timestamp = new Date().toISOString();
-  console.log(`${timestamp} [INFO] ${message}`);
-  fs.appendFileSync('ai_interaction.log', `${timestamp} [INFO] ${message}\n`);
+	const timestamp = new Date().toISOString()
+	console.log(`${timestamp} [INFO] ${message}`)
+	fs.appendFileSync("ai_interaction.log", `${timestamp} [INFO] ${message}\n`)
 }
 
 export function logError(message: string): void {
-  const timestamp = new Date().toISOString();
-  console.error(`${timestamp} [ERROR] ${message}`);
-  fs.appendFileSync('ai_interaction.log', `${timestamp} [ERROR] ${message}\n`);
+	const timestamp = new Date().toISOString()
+	console.error(`${timestamp} [ERROR] ${message}`)
+	fs.appendFileSync("ai_interaction.log", `${timestamp} [ERROR] ${message}\n`)
 }
 
 export function getTruncatedMessages(

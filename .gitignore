@@ -1,6 +1,22 @@
-dist
-build
-node_modules
+
+build/
+dist/
+node_modules/
+wheels/
+*.egg-info
+
+
+.env
+.env.development
+.env.production
+*.pem
+メモ.md
+
+
+# クラッシュログファイル
+crash.log
+crash.*.log
+
 tmp
 .vscode-test/
 *.vsix

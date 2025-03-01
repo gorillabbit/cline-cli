@@ -1,6 +1,6 @@
 import { Anthropic } from "@anthropic-ai/sdk"
 
-export async function downloadTask(dateTs: number, conversationHistory: Anthropic.MessageParam[]) {
+export async function downloadTask(dateTs: number) {
 	// File name
 	const date = new Date(dateTs)
 	const month = date.toLocaleString("en-US", { month: "short" }).toLowerCase()
@@ -25,7 +25,7 @@ export function formatContentBlockToMarkdown(
 			return block.text
 		case "image":
 			return `[Image]`
-		case "tool_use":
+		case "tool_use": {
 			let input: string
 			if (typeof block.input === "object" && block.input !== null) {
 				input = Object.entries(block.input)
@@ -35,7 +35,8 @@ export function formatContentBlockToMarkdown(
 				input = String(block.input)
 			}
 			return `[Tool Use: ${block.name}]\n${input}`
-		case "tool_result":
+		}
+		case "tool_result": {
 			// For now we're not doing tool name lookup since we don't use tools anymore
 			// const toolName = findToolName(block.tool_use_id, messages)
 			const toolName = "Tool"
@@ -48,6 +49,7 @@ export function formatContentBlockToMarkdown(
 			} else {
 				return `[${toolName}${block.is_error ? " (Error)" : ""}]`
 			}
+		}
 		default:
 			return "[Unexpected content type]"
 	}

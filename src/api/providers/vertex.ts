@@ -2,7 +2,7 @@ import { Anthropic } from "@anthropic-ai/sdk"
 import { AnthropicVertex } from "@anthropic-ai/vertex-sdk"
 import { ApiHandler } from ".."
 import { ApiHandlerOptions, ModelInfo, vertexDefaultModelId, VertexModelId, vertexModels } from "../../shared/api.js"
-import { ApiStream } from "../transform/stream.js"
+import { ApiResponse } from "../transform/stream.js"
 
 // https://docs.anthropic.com/en/api/claude-on-vertex-ai
 export class VertexHandler implements ApiHandler {
@@ -18,60 +18,21 @@ export class VertexHandler implements ApiHandler {
 		})
 	}
 
-	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
-		const stream = await this.client.messages.create({
+	async createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiResponse {
+		const response = await this.client.messages.create({
 			model: this.getModel().id,
 			max_tokens: this.getModel().info.maxTokens || 8192,
 			temperature: 0,
 			system: systemPrompt,
 			messages,
-			stream: true,
 		})
-		for await (const chunk of stream) {
-			switch (chunk.type) {
-				case "message_start":
-					const usage = chunk.message.usage
-					yield {
-						type: "usage",
-						inputTokens: usage.input_tokens || 0,
-						outputTokens: usage.output_tokens || 0,
-					}
-					break
-				case "message_delta":
-					yield {
-						type: "usage",
-						inputTokens: 0,
-						outputTokens: chunk.usage.output_tokens || 0,
-					}
-					break
 
-				case "content_block_start":
-					switch (chunk.content_block.type) {
-						case "text":
-							if (chunk.index > 0) {
-								yield {
-									type: "text",
-									text: "\n",
-								}
-							}
-							yield {
-								type: "text",
-								text: chunk.content_block.text,
-							}
-							break
-					}
-					break
-				case "content_block_delta":
-					switch (chunk.delta.type) {
-						case "text_delta":
-							yield {
-								type: "text",
-								text: chunk.delta.text,
-							}
-							break
-					}
-					break
-			}
+		return {
+			text: response.content[0].type === "text" ? response.content[0].text : "",
+			usage: {
+				inputTokens: response.usage.input_tokens || 0,
+				outputTokens: response.usage.output_tokens || 0,
+			},
 		}
 	}
 

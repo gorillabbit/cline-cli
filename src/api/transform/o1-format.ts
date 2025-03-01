@@ -345,22 +345,6 @@ function validateToolInput(toolName: string, tool_input: Record<string, string>)
 	}
 }
 
-// Example usage:
-// const aiResponse = `Here's my analysis of the situation...
-
-// <execute_command>
-//   <command>ls -la</command>
-// </execute_command>
-
-// <write_to_file>
-//   <path>./example.txt</path>
-//   <content>Hello, World!</content>
-// </write_to_file>`;
-//
-// const { normalText, toolCalls } = parseAIResponse(aiResponse);
-// console.log(normalText);
-// console.log(toolCalls);
-
 // Convert OpenAI response to Anthropic format
 export function convertO1ResponseToAnthropicMessage(
 	completion: OpenAI.Chat.Completions.ChatCompletion,
@@ -414,19 +398,3 @@ export function convertO1ResponseToAnthropicMessage(
 
 	return anthropicMessage
 }
-
-// Example usage:
-// const openAICompletion = {
-//     id: "cmpl-123",
-//     choices: [{
-//         message: {
-//             role: "assistant",
-//             content: "Here's my analysis...\n\n<execute_command>\n  <command>ls -la</command>\n</execute_command>"
-//         },
-//         finish_reason: "stop"
-//     }],
-//     model: "gpt-3.5-turbo",
-//     usage: { prompt_tokens: 50, completion_tokens: 100 }
-// };
-// const anthropicMessage = convertO1ResponseToAnthropicMessage(openAICompletion);
-// console.log(anthropicMessage);

@@ -3,7 +3,7 @@ import OpenAI, { AzureOpenAI } from "openai"
 import { ApiHandlerOptions, azureOpenAiDefaultApiVersion, ModelInfo, openAiModelInfoSaneDefaults } from "../../shared/api.js"
 import { ApiHandler } from "../index.js"
 import { convertToOpenAiMessages } from "../transform/openai-format.js"
-import { ApiStream } from "../transform/stream.js"
+import { ApiResponse } from "../transform/stream.js"
 
 export class OpenAiHandler implements ApiHandler {
 	private options: ApiHandlerOptions
@@ -26,33 +26,24 @@ export class OpenAiHandler implements ApiHandler {
 		}
 	}
 
-	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
+	async createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiResponse {
 		const openAiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
 			{ role: "system", content: systemPrompt },
 			...convertToOpenAiMessages(messages),
 		]
-		const stream = await this.client.chat.completions.create({
+		const response = await this.client.chat.completions.create({
 			model: this.options.openAiModelId ?? "",
 			messages: openAiMessages,
 			temperature: 0,
-			stream: true,
 			stream_options: { include_usage: true },
 		})
-		for await (const chunk of stream) {
-			const delta = chunk.choices[0]?.delta
-			if (delta?.content) {
-				yield {
-					type: "text",
-					text: delta.content,
-				}
-			}
-			if (chunk.usage) {
-				yield {
-					type: "usage",
-					inputTokens: chunk.usage.prompt_tokens || 0,
-					outputTokens: chunk.usage.completion_tokens || 0,
-				}
-			}
+
+		return {
+			text: response.choices[0]?.message?.content || "",
+			usage: {
+				inputTokens: response.usage?.prompt_tokens || 0,
+				outputTokens: response.usage?.completion_tokens || 0,
+			},
 		}
 	}
 

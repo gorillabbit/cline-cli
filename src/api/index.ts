@@ -9,12 +9,12 @@ import { OllamaHandler } from "./providers/ollama.js"
 import { LmStudioHandler } from "./providers/lmstudio.js"
 import { GeminiHandler } from "./providers/gemini.js"
 import { OpenAiNativeHandler } from "./providers/openai-native.js"
-import { ApiStream } from "./transform/stream"
+import { ApiResponse } from "./transform/stream"
 import { DeepSeekHandler } from "./providers/deepseek.js"
 import { MistralHandler } from "./providers/mistral.js"
 
 export interface ApiHandler {
-	createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream
+	createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiResponse
 	getModel(): { id: string; info: ModelInfo }
 }
 

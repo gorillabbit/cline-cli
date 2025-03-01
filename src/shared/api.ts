@@ -38,7 +38,7 @@ export interface ApiHandlerOptions {
 	deepSeekApiKey?: string
 	mistralApiKey?: string
 	azureApiVersion?: string
-	vsCodeLmModelSelector?: any
+	vsCodeLmModelSelector?: unknown
 }
 
 export type ApiConfiguration = ApiHandlerOptions & {
