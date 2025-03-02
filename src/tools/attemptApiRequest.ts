@@ -13,7 +13,7 @@ import { buildApiHandler } from "../api/index.js"
 import { ApiResponse } from "../api/transform/stream.js"
 
 /**
- * APIリクエスト用のシステムプロンプトを構築する
+ * Build a system prompt for API requests
  */
 async function buildSystemPrompt(): Promise<string> {
 	const state = globalStateManager.state
@@ -22,12 +22,12 @@ async function buildSystemPrompt(): Promise<string> {
 	}
 	let prompt = await SYSTEM_PROMPT(state.workspaceFolder)
 
-	// ユーザー固有の設定
+	// User-specific settings
 	const customInstructions = state.customInstructions?.trim()
 	const clineRulesFilePath = path.resolve(state.workspaceFolder, GlobalFileNames.clineRules)
 	let clineRulesInstructions: string | undefined
 
-	// .clinerulesファイルの内容を読み込む
+	// Read the contents of the .clinerules file
 	if (await fileExistsAtPath(clineRulesFilePath)) {
 		try {
 			const ruleFileContent = (await fs.readFile(clineRulesFilePath, "utf8")).trim()
@@ -35,11 +35,11 @@ async function buildSystemPrompt(): Promise<string> {
 				clineRulesInstructions = `# .clinerules\n\nThe following instructions are provided by the .clinerules file for this working directory (${state.workspaceFolder}):\n\n${ruleFileContent}`
 			}
 		} catch (error) {
-			console.error("[buildSystemPrompt] .clinerulesファイルの読み込み中にエラーが発生しました。", error)
+			console.error("[buildSystemPrompt] Error occurred while reading the .clinerules file.", error)
 		}
 	}
 
-	// ユーザー設定および.clinerulesの内容をプロンプトに追加
+	// Add user settings and .clinerules content to the prompt
 	if (customInstructions || clineRulesInstructions) {
 		prompt += addUserInstructions(customInstructions, clineRulesInstructions)
 	}
@@ -47,10 +47,10 @@ async function buildSystemPrompt(): Promise<string> {
 }
 
 /**
- * コンテキストウィンドウサイズに応じた最大許容トークン数を計算する
+ * Calculate the maximum allowed tokens based on the context window size
  */
 function getMaxAllowedTokens(apiHandler: ReturnType<typeof buildApiHandler>): number {
-	// 基本はコンテキストサイズに応じたマージンを引く
+	// Subtract a margin based on the context size
 	let contextWindow = apiHandler.getModel().info.contextWindow || 128_000
 	if (apiHandler instanceof OpenAiHandler && apiHandler.getModel().id.toLowerCase().includes("deepseek")) {
 		contextWindow = 64_000
@@ -68,7 +68,7 @@ function getMaxAllowedTokens(apiHandler: ReturnType<typeof buildApiHandler>): nu
 }
 
 /**
- * 前回のリクエストのトークン使用量を確認し、必要なら会話履歴のトリミングを行う
+ * Check the token usage of the previous request and trim the conversation history if necessary
  */
 async function trimHistoryIfNeeded(previousApiReqIndex: number): Promise<void> {
 	const state = globalStateManager.state
@@ -84,9 +84,9 @@ async function trimHistoryIfNeeded(previousApiReqIndex: number): Promise<void> {
 		const apiHandler = buildApiHandler(apiStateManager.getState())
 		const maxAllowed = getMaxAllowedTokens(apiHandler)
 
-		console.log(`[trimHistoryIfNeeded] トークン合計: ${totalTokens} / 最大許容: ${maxAllowed}`)
+		console.log(`[trimHistoryIfNeeded] Total tokens: ${totalTokens} / Max allowed: ${maxAllowed}`)
 		if (totalTokens >= maxAllowed) {
-			console.log("[trimHistoryIfNeeded] コンテキストウィンドウに近づいたため、履歴をトリミングします。")
+			console.log("[trimHistoryIfNeeded] Approaching context window limit, trimming history.")
 			const keep = totalTokens / 2 > maxAllowed ? "quarter" : "half"
 			const newRange = getNextTruncationRange(state.apiConversationHistory, state.conversationHistoryDeletedRange, keep)
 			state.conversationHistoryDeletedRange = newRange
@@ -96,46 +96,46 @@ async function trimHistoryIfNeeded(previousApiReqIndex: number): Promise<void> {
 
 /**
  * attemptApiRequest
- * APIリクエストを取得するための関数
+ * Function to obtain an API request
  *
- * @param previousApiReqIndex 前回のAPIリクエストのインデックス
+ * @param previousApiReqIndex Index of the previous API request
  */
 export async function attemptApiRequest(previousApiReqIndex: number): ApiResponse {
 	const state = globalStateManager.state
 	const apiHandler = buildApiHandler(apiStateManager.getState())
 
-	// システムプロンプト構築
+	// Build system prompt
 	const systemPrompt = await buildSystemPrompt()
 
-	// 履歴トリミングの必要があれば実施
+	// Trim history if necessary
 	await trimHistoryIfNeeded(previousApiReqIndex)
 
-	// トリミング済みの会話履歴を取得
+	// Get trimmed conversation history
 	const truncatedHistory = getTruncatedMessages(state.apiConversationHistory, state.conversationHistoryDeletedRange)
 
-	// レスポンス生成
+	// Generate response
 	return await apiHandler.createMessage(systemPrompt, truncatedHistory)
 }
 
 /**
- * 会話履歴トリミング用の次の削除範囲を計算する関数。
- * 常に最初のメッセージ (index=0) は保持し、ユーザー・アシスタントペアを保ったまま削減します。
+ * Function to calculate the next deletion range for conversation history trimming.
+ * Always keeps the first message (index=0) and reduces while maintaining user-assistant pairs.
  *
- * @param messages 全会話メッセージ
- * @param currentDeletedRange これまでに削除した範囲（任意）
- * @param keep "half" なら半分、"quarter" なら4分の1だけ残す
- * @returns [start, end] の削除範囲
+ * @param messages All conversation messages
+ * @param currentDeletedRange The range deleted so far (optional)
+ * @param keep "half" to keep half, "quarter" to keep a quarter
+ * @returns [start, end] deletion range
  */
 export function getNextTruncationRange(
 	messages: Anthropic.Messages.MessageParam[],
 	currentDeletedRange: [number, number] | undefined = undefined,
 	keep: "half" | "quarter" = "half",
 ): [number, number] {
-	// 最初のメッセージは必ず保持するため、削除は index 1 から開始
+	// Always keep the first message, so deletion starts from index 1
 	const rangeStart = 1
 	const startIndex = currentDeletedRange ? currentDeletedRange[1] + 1 : rangeStart
 
-	// 削除すべきメッセージ数を算出
+	// Calculate the number of messages to remove
 	let messagesToRemove: number
 	if (keep === "half") {
 		messagesToRemove = Math.floor((messages.length - startIndex) / 4) * 2
@@ -143,10 +143,10 @@ export function getNextTruncationRange(
 		messagesToRemove = Math.floor((messages.length - startIndex) / 8) * 3 * 2
 	}
 
-	// 終了インデックスの計算
+	// Calculate the end index
 	let rangeEnd = startIndex + messagesToRemove - 1
 
-	// ユーザーとアシスタントのペア構造を保つため、最後がユーザーのメッセージになるよう調整
+	// Adjust to ensure the last message is a user message to maintain user-assistant pair structure
 	if (messages[rangeEnd]?.role !== "user") {
 		rangeEnd -= 1
 	}

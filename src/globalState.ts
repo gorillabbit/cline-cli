@@ -47,7 +47,7 @@ export interface GlobalState {
 class GlobalStateManager {
 	private static instance: GlobalStateManager
 
-	// ※Note: Be careful only here: Always use the same this._state so that the update is reflected
+	// Note: Be careful only here: Always use the same this._state so that the update is reflected
 	private _state: GlobalState = {
 		clineMessages: [],
 		apiConversationHistory: [],

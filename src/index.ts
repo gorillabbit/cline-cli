@@ -14,10 +14,10 @@ const requireApiKey = async (config: ClineConfig, keyName: keyof ClineConfig) =>
 		const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
 		try {
 			const answer = await new Promise<string>((resolve) => {
-				rl.question(`値が見つかりません。新しい ${keyName} を入力してください: `, resolve)
+				rl.question(`Value not found. Please enter a new ${keyName}: `, resolve)
 			})
 			await setConfig({ [keyName]: answer })
-			console.log(`新しい ${keyName} が設定されました: ${answer}`)
+			console.log(`New ${keyName} has been set: ${answer}`)
 		} catch (err) {
 			console.error("An error occurred:", err)
 		} finally {
@@ -27,10 +27,10 @@ const requireApiKey = async (config: ClineConfig, keyName: keyof ClineConfig) =>
 }
 
 /**
- * main: 入力 JSON を読み込み、各修正タスクを並列に実行する。
+ * main: Read input JSON and execute each modification task in parallel.
  */
 async function main() {
-	// AIによる処理をCLIから実行
+	// Execute AI processing from CLI
 	const taskId = randomUUID()
 	await ensureTaskDirectoryExists(taskId)
 
@@ -40,7 +40,7 @@ async function main() {
 		type: "string",
 	}).argv
 
-	// コマンドの引数から、指示と対象リポジトリパスを取得
+	// Get instructions and target repository path from command arguments
 	const workspaceFolder = argv._[0] as string
 	let instruction = argv._[1] as string
 	globalStateManager.state.workspaceFolder = workspaceFolder

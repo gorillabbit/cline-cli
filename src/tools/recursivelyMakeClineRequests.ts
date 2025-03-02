@@ -72,10 +72,10 @@ export const processClineRequests = async (
 			didProcessAssistantMessage = true
 		}
 
-		// 次のリクエスト用のユーザーコンテンツを取得
+		// Get user content for the next request
 		userContent = state.userMessageContent
 
-		// ── ツール使用がなかった場合、または完了シグナルの場合は、ループを抜ける ──
+		// ── Exit loop if no tool usage or completion signal ──
 		if (didProcessAssistantMessage && !assistantResponseContainsToolUsage()) {
 			updateUserContentNoTool()
 			break
@@ -97,16 +97,16 @@ export const processClineRequests = async (
 	return false
 }
 
-/* ── ヘルパー関数群 ── */
+/* ── Helper functions ── */
 
 /**
- * 連続ミスの確認を行い、必要ならユーザーに問い合わせた上で状態をリセットする。
+ * Check for consecutive mistakes and reset state if necessary after querying the user.
  */
 async function checkLimits(userContent: UserContent): Promise<void> {
 	const state = globalStateManager.state
 
 	if (state.consecutiveMistakeCount >= 6) {
-		// ユーザーへ通知＆ガイダンス取得（実装詳細は省略）
+		// Notify user & get guidance (implementation details omitted)
 		console.log("[Error] Cline is having problems. Aborting task")
 		userContent.push({
 			type: "text",
@@ -118,14 +118,14 @@ async function checkLimits(userContent: UserContent): Promise<void> {
 }
 
 /**
- * ユーザーコンテンツからリクエスト用テキストを生成する
+ * Generate request text from user content
  */
 function formatRequest(userContent: UserContent): string {
 	return userContent.map(formatContentBlockToMarkdown).join("\\n\\n")
 }
 
 /**
- * チェックポイントトラッカーが未初期化の場合、初期化する
+ * Initialize checkpoint tracker if not already initialized
  */
 async function initCheckpointTracker(): Promise<void> {
 	const state = globalStateManager.state
@@ -134,14 +134,14 @@ async function initCheckpointTracker(): Promise<void> {
 			state.checkpointTracker = await CheckpointTracker.create(state.taskId)
 			state.checkpointTrackerErrorMessage = undefined
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : "不明なエラー"
+			const errorMessage = error instanceof Error ? error.message : "Unknown error"
 			state.checkpointTrackerErrorMessage = errorMessage
 		}
 	}
 }
 
 /**
- * 最後の「api_req_started」メッセージを更新する
+ * Update the last "api_req_started" message
  */
 function updateLastApiRequestMessage(userContent: UserContent): void {
 	const messages = globalStateManager.state.clineMessages
@@ -152,7 +152,7 @@ function updateLastApiRequestMessage(userContent: UserContent): void {
 }
 
 /**
- * ストリーム処理前に各種ストリーム関連状態をリセットする
+ * Reset various stream-related states before stream processing
  */
 function resetStreamingState(): void {
 	const state = globalStateManager.state
@@ -168,7 +168,7 @@ function resetStreamingState(): void {
 }
 
 /**
- * APIからのレスポンスストリームを処理し、アシスタントメッセージとトークン使用量を返す
+ * Process the response stream from the API and return the assistant message and token usage
  */
 async function processApiStream(): Promise<{
 	assistantMessage: string
@@ -186,7 +186,7 @@ async function processApiStream(): Promise<{
 	const tokenUsage = { inputTokens: 0, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, totalCost: undefined }
 
 	try {
-		// 直近のAPIリクエストのインデックスを取得（トークン使用量を把握し、履歴をトリムするかなどの判定に使用）
+		// Get the index of the most recent API request (used to track token usage and determine if history needs trimming)
 		const previousApiReqIndex = findLastIndex(state.clineMessages, (m) => m.say === "api_req_started")
 
 		const response = await attemptApiRequest(previousApiReqIndex)
@@ -195,7 +195,7 @@ async function processApiStream(): Promise<{
 		tokenUsage.cacheWriteTokens += response.usage.cacheWriteTokens ?? 0
 		tokenUsage.cacheReadTokens += response.usage.cacheReadTokens ?? 0
 		assistantMessage = response.text
-		// console.log("[processApiStream] APIリクエスト成功: レスポンス", response.text)
+		// console.log("[processApiStream] API request successful: response", response.text)
 		state.assistantMessageContent = parseAssistantMessage(assistantMessage)
 		await presentAssistantMessage()
 	} catch (error) {
@@ -207,7 +207,7 @@ async function processApiStream(): Promise<{
 }
 
 /**
- * ストリーム中断時の処理（アシスタントへの通知など）を行う
+ * Handle stream abort (e.g., notify assistant, etc.)
  */
 async function handleStreamAbort(
 	cancelReason: ClineApiReqCancelReason,
@@ -220,27 +220,27 @@ async function handleStreamAbort(
 			{
 				type: "text",
 				text:
-					assistantMessage + `\\n\\n[${cancelReason === "streaming_failed" ? "APIエラーによる中断" : "ユーザー中断"}]`,
+					assistantMessage + `\\n\\n[${cancelReason === "streaming_failed" ? "API error caused interruption" : "User interruption"}]`,
 			},
 		],
 	})
-	// 必要に応じた追加処理（例：abortTask の呼び出しや履歴の再初期化）を実施
-	console.log(`[handleStreamAbort] ストリーム中断: ${cancelReason} - ${errorMessage}`)
+	// Perform additional processing as needed (e.g., call abortTask or reinitialize history)
+	console.log(`[handleStreamAbort] Stream aborted: ${cancelReason} - ${errorMessage}`)
 }
 
 /**
- * アシスタントのレスポンスが空の場合のエラー処理
+ * Handle error when the assistant's response is empty
  */
 async function handleEmptyAssistantResponse(): Promise<void> {
-	await say(Say.ERROR, "予期しないAPIレスポンス: アシスタントメッセージが返されませんでした。")
+	await say(Say.ERROR, "Unexpected API response: No assistant message returned.")
 	await addToApiConversationHistory({
 		role: "assistant",
-		content: [{ type: "text", text: "失敗: レスポンスが提供されませんでした。" }],
+		content: [{ type: "text", text: "Failure: No response provided." }],
 	})
 }
 
 /**
- * APIリクエストメッセージにトークン使用量を反映する
+ * Reflect token usage in the API request message
  */
 function updateLastApiRequestMessageWithUsage(tokenUsage: {
 	inputTokens: number
@@ -265,7 +265,7 @@ function updateLastApiRequestMessageWithUsage(tokenUsage: {
 }
 
 /**
- * アシスタントのレスポンス内にツール使用ブロックが含まれているかを判定する
+ * Determine if the assistant's response contains a tool usage block
  */
 function assistantResponseContainsToolUsage(): boolean {
 	const state = globalStateManager.state
@@ -273,7 +273,7 @@ function assistantResponseContainsToolUsage(): boolean {
 }
 
 /**
- * ツール未使用の場合、ユーザーにその旨を伝え、ミスカウントを更新する
+ * Notify the user if no tools were used and update the mistake count
  */
 function updateUserContentNoTool(): void {
 	const state = globalStateManager.state
