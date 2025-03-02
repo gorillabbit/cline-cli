@@ -28,16 +28,16 @@ const runCommand = async (command: string, tempFilePath: string, gitInfo: string
 
 		return { type: "success", output: output }
 	} catch (error) {
-		console.error(`エラーが発生しました: ${error.message}`)
+		console.error(`An error occurred: ${error.message}`)
 		const output = await fs.readFile(tempFilePath, "utf-8")
 		return { type: "error", output: output }
 	}
 }
 
 /**
- * コマンドツールを実行し、コマンド出力とユーザーフィードバックを処理します。
- * @param {string} command - 実行するコマンド。
- * @returns {Promise<[boolean, ToolResponse]>} - ユーザーが拒否したフラグとツール応答を含むタプルに解決されるプロミス。
+ * Executes the command tool and processes the command output and user feedback.
+ * @param {string} command - The command to execute.
+ * @returns {Promise<[ToolResponse]>} - A promise that resolves to a tuple containing the user-rejected flag and the tool response.
  */
 export const executeCommandTool = async (command: string): Promise<[ToolResponse]> => {
 	const timestamp = Date.now()

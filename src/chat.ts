@@ -4,7 +4,7 @@ import { addToClineMessages } from "./tasks.js"
 import { Ask, MessageType } from "./database.js"
 
 /**
- * askResponse 関連の状態をクリアする
+ * Clears the state related to askResponse
  */
 function clearAskResponse(): void {
 	const state = globalStateManager.state
@@ -14,12 +14,12 @@ function clearAskResponse(): void {
 }
 
 /**
- * ask 関数
- * ・partial が true の場合は既存の部分更新メッセージがあれば更新、なければ新規追加後エラーで処理を中断
- * ・partial が false の場合は既存の部分メッセージを完結させるか、または新規追加
- * ・partial が undefined の場合は通常の新規 ask として追加
+ * ask function
+ * If partial is true, update the existing partial update message if it exists, otherwise interrupt the process with an error after adding a new one.
+ * If partial is false, complete the existing partial message or add a new one.
+ * If partial is undefined, add as a normal new ask.
  *
- * 後続で globalStateManager の askResponse が設定されるまで待機し、該当メッセージに対する応答を返します。
+ * Waits for globalStateManager's askResponse to be set in the subsequent process and returns a response to the corresponding message.
  */
 export const ask = async (type: Ask, text?: string): Promise<{ response: ClineAskResponse; text?: string; images?: string }> => {
 	clearAskResponse()
@@ -30,7 +30,7 @@ export const ask = async (type: Ask, text?: string): Promise<{ response: ClineAs
 	state.askResponseText = "yes"
 	state.askResponseImages = ""
 
-	// partial が undefined の場合は通常の新規 ask として追加
+	// If partial is undefined, add as a normal new ask
 	askTs = Date.now()
 	state.lastMessageTs = askTs
 	await addToClineMessages({

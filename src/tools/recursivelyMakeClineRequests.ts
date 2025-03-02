@@ -12,10 +12,10 @@ import { presentAssistantMessage } from "./presentAssistantMessage.js"
 import { Say } from "../database.js"
 
 /**
- * APIリクエストの流れを「ユーザーコンテンツがなくなるまで」ループで処理する簡潔な実装例
- * @param initialUserContent ユーザーコンテンツ（ContentBlockの配列）
- * @param includeFileDetails 環境コンテキストにファイルの詳細を含めるかどうか
- * @returns ユーザー側の中断等で早期終了した場合は true、通常は false を返す
+ * A concise example of processing the API request flow in a loop "until there is no more user content".
+ * @param initialUserContent User content (array of ContentBlock)
+ * @param includeFileDetails Whether to include file details in the environment context
+ * @returns Returns true if the user interrupts, etc., and ends early, false otherwise
  */
 export const processClineRequests = async (
 	initialUserContent: UserContent,
@@ -25,40 +25,45 @@ export const processClineRequests = async (
 	const state = globalStateManager.state
 	let didProcessAssistantMessage = false
 
-	// ユーザーコンテンツが存在する限りループ
+	// Loop as long as user content exists
 	while (userContent.length > 0) {
 		// Added check for task completion
 		if (state.taskCompleted) {
 			return true
 		}
-		// ── 前処理: 中断チェック＆各種リミットの確認 ──
+		// ── Pre-processing: Interrupt check & limit confirmation ──
 		if (state.abort) {
 			throw new Error("Cline instance aborted")
 		}
 		await checkLimits(userContent)
 
-		// ── APIリクエストの準備 ──
+		// ── Preparing the API request ──
 		const requestText = formatRequest(userContent)
 		await say(Say.API_REQ_STARTED, JSON.stringify({ request: requestText + "\\n\\nLoading..." }))
 		await initCheckpointTracker()
 
-		// 環境コンテキストを読み込み、ユーザーコンテンツに付与する
+		// Load environment context and add it to user content
 		const [parsedContent, envDetails] = await loadContext(userContent, includeFileDetails)
 		userContent = [...parsedContent, { type: "text", text: envDetails }]
+		// ── Add assistant response to conversation history ──
 		await addToApiConversationHistory({ role: "user", content: userContent })
 		updateLastApiRequestMessage(userContent)
 
-		// ── ストリーム処理前の状態リセット ──
+		// ── Reset stream-related state before stream processing ──
 		resetStreamingState()
 
-		// ── APIリクエストストリームの実行 ──
-		const { assistantMessage, tokenUsage, error: streamError } = await processApiStream()
+		// ── Execute API request stream ──
+		const {
+			assistantMessage,
+			tokenUsage,
+			error: streamError,
+		} = await processApiStream()
 		if (streamError) {
 			await handleStreamAbort("streaming_failed", streamError as string, assistantMessage)
 		} else if (!assistantMessage) {
 			await handleEmptyAssistantResponse()
 		} else {
-			// ── アシスタントレスポンスを会話履歴に追加 ──
+			// ── Add user response to conversation history ──
 			await addToApiConversationHistory({
 				role: "assistant",
 				content: [{ type: "text", text: assistantMessage }],
@@ -102,7 +107,7 @@ async function checkLimits(userContent: UserContent): Promise<void> {
 
 	if (state.consecutiveMistakeCount >= 6) {
 		// ユーザーへ通知＆ガイダンス取得（実装詳細は省略）
-		console.log("[エラー] Clineが問題を抱えています。タスクを中断します")
+		console.log("[Error] Cline is having problems. Aborting task")
 		userContent.push({
 			type: "text",
 			text: formatResponse.tooManyMistakes(),

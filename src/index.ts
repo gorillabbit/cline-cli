@@ -19,7 +19,7 @@ const requireApiKey = async (config: ClineConfig, keyName: keyof ClineConfig) =>
 			await setConfig({ [keyName]: answer })
 			console.log(`新しい ${keyName} が設定されました: ${answer}`)
 		} catch (err) {
-			console.error("エラーが発生しました:", err)
+			console.error("An error occurred:", err)
 		} finally {
 			rl.close()
 		}
@@ -93,10 +93,10 @@ async function main() {
 
 main().catch((error) => {
 	if (error instanceof Error) {
-		console.error("エラーメッセージ:", error.message)
-		console.error("スタックトレース:", error.stack)
+		console.error("Error message:", error.message)
+		console.error("Stack trace:", error.stack)
 	} else {
-		console.error("予期しないエラー:", error)
+		console.error("Unexpected error:", error)
 	}
 	process.exit(1)
 })

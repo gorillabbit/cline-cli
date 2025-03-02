@@ -110,7 +110,7 @@ export class AnthropicHandler implements ApiHandler {
 		}
 
 		const result = {
-			text: "ここはダミー。まだ修正ができてない。",
+			text: "This is a dummy. It has not been fixed yet.",
 			usage: {
 				inputTokens: stream.usage.input_tokens || 0,
 				outputTokens: stream.usage.output_tokens || 0,

@@ -47,7 +47,7 @@ export interface GlobalState {
 class GlobalStateManager {
 	private static instance: GlobalStateManager
 
-	// ※ここだけ注意: 更新が反映されるよう、常に同じ this._state を使う
+	// ※Note: Be careful only here: Always use the same this._state so that the update is reflected
 	private _state: GlobalState = {
 		clineMessages: [],
 		apiConversationHistory: [],
@@ -83,12 +83,12 @@ class GlobalStateManager {
 		return GlobalStateManager.instance
 	}
 
-	// state はゲッターで公開
+	// state is exposed with getter
 	public get state(): GlobalState {
 		return this._state
 	}
 
-	// 更新も同一オブジェクトに対して行う
+	// Updates are also performed on the same object
 	public updateState(newState: Partial<GlobalState>): void {
 		Object.assign(this._state, newState)
 	}

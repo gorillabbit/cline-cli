@@ -9,10 +9,10 @@ import { formatResponse } from "../prompts/responses.js"
 import { UserContent } from "../types.js"
 
 /**
- * コンテキスト情報（解析されたユーザーコンテンツ、環境詳細など）をロードします。
- * @param {UserContent} userContent - コンテキストをロードするユーザーコンテンツ。
- * @param {boolean} [includeFileDetails=false] - 環境コンテキストにファイルの詳細を含めるかどうか。
- * @returns 解析されたユーザーコンテンツと環境詳細。
+ * Loads context information (parsed user content, environment details, etc.).
+ * @param {UserContent} userContent - The user content to load the context for.
+ * @param {boolean} [includeFileDetails=false] - Whether to include file details in the environment context.
+ * @returns The parsed user content and environment details.
  */
 export const loadContext = async (userContent: UserContent, includeFileDetails: boolean = false) => {
 	const result = await Promise.all([
@@ -42,9 +42,9 @@ export const loadContext = async (userContent: UserContent, includeFileDetails: 
 }
 
 /**
- * 環境詳細（現在の時刻、作業ディレクトリのファイル、現在のモードなど）を取得します。
- * @param {boolean} [includeFileDetails=false] - ファイルの詳細を含めるかどうか.
- * @returns 環境詳細を文字列としてフォーマットしたもの.
+ * Gets environment details (current time, files in the working directory, current mode, etc.).
+ * @param {boolean} [includeFileDetails=false] - Whether to include file details.
+ * @returns Environment details formatted as a string.
  */
 export const getEnvironmentDetails = async (includeFileDetails: boolean = false): Promise<string> => {
 	let details = ""
